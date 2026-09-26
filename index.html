@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>arcgate API reference</title>
+    <meta name="description" content="Search, quote and swap on Arc. Pay per call in USDC with x402. arcgate returns unsigned transactions: your wallet signs, arcgate never does." />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#EEF1EB" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#101815" media="(prefers-color-scheme: dark)" />
+
+    <!-- Absolute URLs below are filled in from DOCS_URL by `pnpm docs:build` (data-env markers);
+         the target attribute is empty here since this file is only a template (docs/site). -->
+    <link rel="canonical" href="https://docs.arcgate.dev/" data-env="DOCS_URL" data-env-attr="href" data-env-path="/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="arcgate" />
+    <meta property="og:title" content="arcgate API reference" />
+    <meta property="og:description" content="Search, quote and swap on Arc. Pay per call in USDC with x402. Unsigned transactions: your wallet signs." />
+    <meta property="og:url" content="https://docs.arcgate.dev/" data-env="DOCS_URL" data-env-attr="content" data-env-path="/" />
+    <meta property="og:image" content="https://docs.arcgate.dev/og.png" data-env="DOCS_URL" data-env-attr="content" data-env-path="/og.png" />
+    <!-- The one API origin the Test Request may pay (docs.js), from API_URL. -->
+    <meta name="arcgate-api" content="https://api.arcgate.dev" data-env="API_URL" data-env-attr="content" data-env-path="" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="./favicon.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
+
+    <!-- Same self-hosted files as arcgate.dev, preloaded so the first paint already has them. -->
+    <link rel="preload" href="./fonts/schibsted-grotesk-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="./fonts/schibsted-grotesk-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="./fonts/martian-mono-latin-wdth-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="./theme.css" />
+
+    <script>
+      // Before first paint: match Scalar's persisted color mode (localStorage "colorMode", falling
+      // back to the system preference) so the static header never flashes the wrong ground, and hold
+      // the header text for at most 300ms while the fonts land (the landing page does the same).
+      (function () {
+        var root = document.documentElement;
+        var stored = null;
+        try { stored = localStorage.getItem("colorMode"); } catch (e) {}
+        var dark = stored === "dark" || (stored !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+        if (dark) root.classList.add("ag-dark");
+        root.classList.add("ag-fonts-pending");
+        var done = function () { root.classList.remove("ag-fonts-pending"); };
+        setTimeout(done, 300);
+        if (document.fonts && document.fonts.load) {
+          Promise.all([
+            document.fonts.load('600 23px "Schibsted Grotesk"'),
+            document.fonts.load('400 14px "Schibsted Grotesk"'),
+            document.fonts.load('12px "Martian Mono"'),
+          ]).then(done, done);
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <a class="ag-skip" href="#ag-reference">Skip to the reference</a>
+    <!-- ag-chrome:header -->
+    <header class="ag-header">
+      <a class="ag-mark" href="https://arcgate.dev/" aria-label="arcgate.dev home">
+        <span class="ag-word">arc</span><span class="ag-gatebar" aria-hidden="true"></span><span class="ag-word">gate</span><span class="ag-suffix">docs</span>
+      </a>
+      <nav class="ag-nav" aria-label="arcgate">
+        <a class="ag-hide-sm" href="./#arcgate/description/prices">Pricing</a>
+        <a class="ag-hide-sm" href="https://arcgate.dev/">arcgate.dev</a>
+        <a href="./tutorials/">Tutorials</a>
+        <a class="ag-current" href="./" aria-current="page">API reference</a>
+      </nav>
+    </header>
+    <!-- /ag-chrome:header -->
+
+    <main id="ag-reference">
+      <div id="app"></div>
+    </main>
+
+    <!-- ag-chrome:footer -->
+    <footer class="ag-footer">
+      <div class="ag-mark ag-mark-sm" aria-hidden="true">
+        <span class="ag-word">arc</span><span class="ag-gatebar"></span><span class="ag-word">gate</span>
+      </div>
+      <nav class="ag-foot-nav" aria-label="footer">
+        <a href="https://arcgate.dev/">arcgate.dev</a>
+        <a href="./#arcgate/description/prices">Pricing</a>
+        <a href="https://api.arcgate.dev/health">API health</a>
+        <span class="ag-chain">Arc mainnet · chain 5042</span>
+      </nav>
+    </footer>
+    <!-- /ag-chrome:footer -->
+
+    <!-- Scalar's standalone bundle, pinned and integrity-checked. Bumping the version means
+         recomputing the hash: curl -s <url> | openssl dgst -sha384 -binary | openssl base64 -A -->
+    <script
+      src="https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.72.1/dist/browser/standalone.js"
+      integrity="sha384-U11tb2XnKvmwt8RlTvnwUnYgrN+ur4Xyh9htLhjajWNR/Oyl5AX5DEz00qRmlrmK"
+      crossorigin="anonymous"
+    ></script>
+    <script src="./docs.js"></script>
+  </body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "name": "arcgate",
+  "description": "arcgate's agent skills: trade on Arc through the arcgate API, paid per call over x402.",
+  "owner": {
+    "name": "arcgate"
+  },
+  "plugins": [
+    {
+      "name": "arcgate-trade",
+      "source": "./plugin",
+      "version": "1.0.0",
+      "description": "Use when an agent needs to turn a plain-English crypto order on Arc (\"buy 100 USDC of X\", \"sell my MOLLY for USDC\") into a checked trade through the arcgate API - resolve the token, quote it, read the safety verdict, and get unsigned transactions for the user's wallet. Every search, quote and swap is paid per call in real USDC over x402; includes a script that makes those paid calls with a wallet key."
+    }
+  ]
+}

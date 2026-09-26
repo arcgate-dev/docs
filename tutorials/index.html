@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Tutorials · arcgate docs</title>
+    <meta name="description" content="Step-by-step tutorials for trading on Arc through arcgate." />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#EEF1EB" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#101815" media="(prefers-color-scheme: dark)" />
+    <link rel="canonical" href="https://docs.arcgate.dev/tutorials/" />
+
+    <link rel="icon" href="../favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="../favicon.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="../apple-touch-icon.png" />
+
+    <link rel="preload" href="../fonts/schibsted-grotesk-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="../fonts/schibsted-grotesk-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="../fonts/martian-mono-latin-wdth-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="../theme.css" />
+    <link rel="stylesheet" href="../tutorials.css" />
+    <script>
+      (function () {
+        var root = document.documentElement;
+        var stored = null;
+        try { stored = localStorage.getItem("colorMode"); } catch (e) {}
+        var dark = stored === "dark" || (stored !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+        if (dark) root.classList.add("ag-dark");
+      })();
+    </script>
+  </head>
+  <body>
+    <a class="ag-skip" href="#ag-tut-article">Skip to the article</a>
+    <header class="ag-header">
+      <a class="ag-mark" href="https://arcgate.dev/" aria-label="arcgate.dev home">
+        <span class="ag-word">arc</span><span class="ag-gatebar" aria-hidden="true"></span><span class="ag-word">gate</span><span class="ag-suffix">docs</span>
+      </a>
+      <nav class="ag-nav" aria-label="arcgate">
+        <a class="ag-hide-sm" href="../#arcgate/description/prices">Pricing</a>
+        <a class="ag-hide-sm" href="https://arcgate.dev/">arcgate.dev</a>
+        <a class="ag-current" href="../tutorials/" aria-current="page">Tutorials</a>
+        <a href="../">API reference</a>
+        <button type="button" class="ag-mode-toggle" data-ag-mode-toggle aria-label="Toggle dark mode"><span data-ag-mode-label>Dark</span></button>
+      </nav>
+    </header>
+    <main id="ag-tut-article" class="ag-tut-main">
+      <div class="ag-tut-index">
+        <h1>Tutorials</h1>
+        <ul class="ag-tut-cards">
+          <li class="ag-tut-card">
+          <a href="./circle-agent-wallet/">
+            <h2>Trade through arcgate with a Circle agent wallet</h2>
+            <p>Pay x402 on Arc testnet with a Circle Developer-Controlled Wallet, then search, quote, and swap on Arc mainnet.</p>
+            <p class="ag-tut-card-wallet">Circle agent wallet</p>
+            
+          </a>
+        </li>
+<li class="ag-tut-card">
+          <a href="./metamask-embedded-wallet/">
+            <h2>Trade through arcgate with a MetaMask Embedded Wallet</h2>
+            <p>Log in with a self-issued JWT, pay x402 on Arc testnet, then search, quote, and swap through Permit2 on Arc mainnet - all with one account.</p>
+            <p class="ag-tut-card-wallet">MetaMask Embedded Wallet</p>
+            <span class="ag-tut-badge">Not yet run end to end</span>
+          </a>
+        </li>
+          <li class="ag-tut-card ag-tut-card-agent">
+          <h2>Using arcgate from an agent</h2>
+          <p>arcgate is also a paid MCP server at <code>POST /trade/v1/mcp</code> (Model Context
+          Protocol): an x402-aware MCP client calls search, quote, swap and venues as tools, at the
+          same prices. Agents that take plain-English orders can load the
+          <code>arcgate-trade</code> skill at <code>skills/arcgate-trade/SKILL.md</code> in the
+          repository. See <a href="../#arcgate/description/mcp-for-agents">MCP for agents</a> in the reference.</p>
+        </li>
+        </ul>
+      </div>
+    </main>
+    <footer class="ag-footer">
+      <div class="ag-mark ag-mark-sm" aria-hidden="true">
+        <span class="ag-word">arc</span><span class="ag-gatebar"></span><span class="ag-word">gate</span>
+      </div>
+      <nav class="ag-foot-nav" aria-label="footer">
+        <a href="https://arcgate.dev/">arcgate.dev</a>
+        <a href="../#arcgate/description/prices">Pricing</a>
+        <a href="https://api.arcgate.dev/health">API health</a>
+        <span class="ag-chain">Arc mainnet · chain 5042</span>
+      </nav>
+    </footer>
+    <div class="ag-sr-only" role="status" aria-live="polite" data-ag-live></div>
+    <script src="../tutorials.js"></script>
+  </body>
+</html>

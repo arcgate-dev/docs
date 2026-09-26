@@ -1,0 +1,50 @@
+[
+  {
+    "id": "buy-amount-in-usdc",
+    "order": "spend 100 USDC on MOLLY",
+    "grammarPattern": "[buy|purchase|spend|get] [$]N [usdc|usd|dollars] (of|in|on|into|for|worth of) TOKEN",
+    "reading": "Spend exactly 100 USDC on MOLLY and receive as much MOLLY as possible.",
+    "quoteRequest": {
+      "sell": "0x3600000000000000000000000000000000000000",
+      "buy": "0x816de78fabdd52922964647529e304a0c86489cd",
+      "amount": "100",
+      "side": "exactIn"
+    }
+  },
+  {
+    "id": "buy-amount-in-token",
+    "order": "buy 100 MOLLY",
+    "grammarPattern": "(buy|purchase|get) N TOKEN",
+    "reading": "Get exactly 100 MOLLY, spending whatever USDC that costs after fees.",
+    "quoteRequest": {
+      "sell": "0x3600000000000000000000000000000000000000",
+      "buy": "0x816de78fabdd52922964647529e304a0c86489cd",
+      "amount": "100",
+      "side": "exactOut"
+    }
+  },
+  {
+    "id": "sell-amount-in-token",
+    "order": "sell 100 MOLLY for usdc",
+    "grammarPattern": "sell N TOKEN [for usdc]",
+    "reading": "Sell exactly 100 MOLLY for however much USDC that returns.",
+    "quoteRequest": {
+      "sell": "0x816de78fabdd52922964647529e304a0c86489cd",
+      "buy": "0x3600000000000000000000000000000000000000",
+      "amount": "100",
+      "side": "exactIn"
+    }
+  },
+  {
+    "id": "sell-amount-in-usdc",
+    "order": "sell MOLLY for 100 usdc",
+    "grammarPattern": "sell TOKEN for [$]N [usdc]",
+    "reading": "Sell just enough MOLLY to receive exactly 100 USDC.",
+    "quoteRequest": {
+      "sell": "0x816de78fabdd52922964647529e304a0c86489cd",
+      "buy": "0x3600000000000000000000000000000000000000",
+      "amount": "100",
+      "side": "exactOut"
+    }
+  }
+]

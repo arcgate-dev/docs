@@ -1,0 +1,809 @@
+/* arcgate docs theme for Scalar (theme: "none").
+ *
+ * Tokens are arcgate.dev's (apps/web/src/index.css): paper, ink, brass, note, serial, sheet, rule.
+ * Light is the landing itself. Dark is the landing's ink code panel promoted to a page: ink ground,
+ * paper text at the panel's alpha steps, brass unchanged, the panel's #6CC79A for "verified".
+ *
+ * Brass is a FILL in light mode (2.35:1 on paper, like the landing's button and gatebar). Anywhere
+ * Scalar paints the accent as text, light mode uses --ag-brass-text (5.35:1). Note and serial are
+ * deepened the same way for small text (5.35:1, 5.58:1). Every text level below passes WCAG AA.
+ */
+
+/* ---------- fonts: the same files the landing self-hosts ---------- */
+@font-face {
+  font-family: "Schibsted Grotesk";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url("./fonts/schibsted-grotesk-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Schibsted Grotesk";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 500;
+  src: url("./fonts/schibsted-grotesk-latin-500-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Schibsted Grotesk";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 600;
+  src: url("./fonts/schibsted-grotesk-latin-600-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Schibsted Grotesk";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 700;
+  src: url("./fonts/schibsted-grotesk-latin-700-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Martian Mono";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 800;
+  font-stretch: 75% 112.5%;
+  src: url("./fonts/martian-mono-latin-ext-wdth-normal.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Martian Mono";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 800;
+  font-stretch: 75% 112.5%;
+  src: url("./fonts/martian-mono-latin-wdth-normal.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+/* ---------- landing tokens ---------- */
+:root {
+  --paper: #eef1eb;
+  --ink: #101815;
+  --brass: #c8961e;
+  --note: #157f4e;
+  --serial: #d1342f;
+  --sheet: #f5f7f3;
+  --muted: rgba(16, 24, 21, 0.6);
+  --rule: rgba(16, 24, 21, 0.16);
+  --rule2: rgba(16, 24, 21, 0.32);
+
+  --ag-brass-text: #7f5c0e;
+  --ag-note-text: #11704a;
+  --ag-serial-text: #b42a26;
+
+  /* the ink panel (CodeSection) */
+  --ag-panel: #101815;
+  --ag-panel-2: #172019;
+  --ag-panel-line: rgba(238, 241, 235, 0.14);
+  --ag-panel-1: #eef1eb;
+  --ag-panel-k: rgba(238, 241, 235, 0.62);
+  --ag-panel-c: rgba(238, 241, 235, 0.5);
+  --ag-panel-g: #6cc79a;
+
+  --ag-header-h: 64px;
+  --ag-sans: "Schibsted Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --ag-mono: "Martian Mono", ui-monospace, monospace;
+
+  /* Scalar: layout and type (mode-independent) */
+  --scalar-custom-header-height: var(--ag-header-h);
+  --scalar-font: var(--ag-sans);
+  --scalar-font-code: var(--ag-mono);
+  --scalar-radius: 2px;
+  --scalar-radius-md: 3px;
+  --scalar-radius-lg: 3px;
+  --scalar-radius-xl: 3px;
+  --scalar-radius-2xl: 4px;
+  --scalar-radius-3xl: 4px;
+  --scalar-border-width: 1px;
+  --scalar-heading-1: 40px;
+  --scalar-page-description: 17px;
+  --scalar-paragraph: 15px;
+  --scalar-text-decoration: underline;
+  --scalar-text-decoration-hover: underline;
+  --scalar-link-font-weight: 500;
+  --scalar-sidebar-indent: 16px;
+}
+@media (max-width: 720px) {
+  :root {
+    --ag-header-h: 56px;
+    --scalar-heading-1: 30px;
+  }
+}
+
+/* ---------- Scalar variables, light: paper and ink ---------- */
+.light-mode {
+  --scalar-background-1: var(--paper);
+  --scalar-background-2: var(--sheet);
+  --scalar-background-3: #e2e6df;
+  --scalar-background-4: #d7dcd4;
+  --scalar-background-accent: rgba(200, 150, 30, 0.14);
+  --scalar-background-card: var(--sheet);
+
+  --scalar-color-1: var(--ink);
+  --scalar-color-2: #5b625e; /* ink 66% on paper, 5.5:1 */
+  --scalar-color-3: #646a66; /* ink 62% on paper, 4.9:1 */
+  --scalar-color-accent: var(--ag-brass-text);
+  --scalar-color-ghost: #646a66;
+  --scalar-color-disabled: #7f8580;
+  --scalar-border-color: var(--rule);
+
+  --scalar-color-green: var(--ag-note-text);
+  --scalar-color-red: var(--ag-serial-text);
+  --scalar-color-yellow: var(--ag-brass-text);
+  --scalar-color-orange: var(--ag-brass-text);
+  --scalar-color-blue: #3e4a44;
+  --scalar-color-purple: #3e4a44;
+  --scalar-color-query: var(--ag-note-text);
+  --scalar-color-alert: var(--ag-brass-text);
+  --scalar-color-danger: var(--ag-serial-text);
+  --scalar-background-alert: rgba(200, 150, 30, 0.12);
+  --scalar-background-danger: rgba(209, 52, 47, 0.08);
+
+  --scalar-link-color: var(--ink);
+  --scalar-link-color-hover: var(--ink);
+  --scalar-link-color-visited: var(--ink);
+  --scalar-text-decoration-color: var(--rule2);
+  --scalar-text-decoration-color-hover: var(--ink);
+
+  --scalar-button-1: var(--brass);
+  --scalar-button-1-hover: #b88a1a;
+  --scalar-button-1-color: var(--ink);
+
+  --scalar-shadow-1: 0 1px 0 var(--rule);
+  --scalar-shadow-2: 0 0 0 1px var(--rule), 0 8px 24px rgba(16, 24, 21, 0.1);
+  --scalar-scrollbar-color: rgba(16, 24, 21, 0.18);
+  --scalar-scrollbar-color-active: rgba(16, 24, 21, 0.36);
+  --scalar-tooltip-background: var(--ink);
+  --scalar-tooltip-color: var(--paper);
+
+  --scalar-sidebar-background-1: var(--paper);
+  --scalar-sidebar-color-1: var(--ink);
+  --scalar-sidebar-color-2: #5b625e;
+  --scalar-sidebar-color-active: var(--ink);
+  --scalar-sidebar-border-color: var(--rule);
+  --scalar-sidebar-item-hover-background: rgba(16, 24, 21, 0.05);
+  --scalar-sidebar-item-hover-color: var(--ink);
+  --scalar-sidebar-item-active-background: var(--sheet);
+  --scalar-sidebar-indent-border: var(--rule);
+  --scalar-sidebar-indent-border-hover: var(--rule2);
+  --scalar-sidebar-indent-border-active: var(--brass);
+  --scalar-sidebar-search-background: var(--sheet);
+  --scalar-sidebar-search-color: #646a66;
+  --scalar-sidebar-search-border-color: var(--rule);
+}
+
+/* ---------- Scalar variables, dark: the ink panel as a page ---------- */
+.dark-mode {
+  --scalar-background-1: var(--ink);
+  --scalar-background-2: #172019;
+  --scalar-background-3: #212b26;
+  --scalar-background-4: #2a352f;
+  --scalar-background-accent: rgba(200, 150, 30, 0.16);
+  --scalar-background-card: #172019;
+
+  --scalar-color-1: var(--paper);
+  --scalar-color-2: #abb0ab; /* paper 70% on ink, 8.2:1 */
+  --scalar-color-3: #8e938f; /* paper 57% on ink, 5.8:1 */
+  --scalar-color-accent: var(--brass);
+  --scalar-color-ghost: #8e938f;
+  --scalar-color-disabled: #747a75;
+  --scalar-border-color: rgba(238, 241, 235, 0.14);
+
+  --scalar-color-green: #6cc79a;
+  --scalar-color-red: #e8625c;
+  --scalar-color-yellow: var(--brass);
+  --scalar-color-orange: var(--brass);
+  --scalar-color-blue: #c9cec8;
+  --scalar-color-purple: #c9cec8;
+  --scalar-color-query: #6cc79a;
+  --scalar-color-alert: var(--brass);
+  --scalar-color-danger: #e8625c;
+  --scalar-background-alert: rgba(200, 150, 30, 0.12);
+  --scalar-background-danger: rgba(232, 98, 92, 0.1);
+
+  --scalar-link-color: var(--paper);
+  --scalar-link-color-hover: var(--paper);
+  --scalar-link-color-visited: var(--paper);
+  --scalar-text-decoration-color: rgba(238, 241, 235, 0.32);
+  --scalar-text-decoration-color-hover: var(--paper);
+
+  --scalar-button-1: var(--brass);
+  --scalar-button-1-hover: #d9a93a;
+  --scalar-button-1-color: var(--ink);
+
+  --scalar-shadow-1: 0 1px 0 rgba(238, 241, 235, 0.1);
+  --scalar-shadow-2: 0 0 0 1px rgba(238, 241, 235, 0.14), 0 8px 24px rgba(0, 0, 0, 0.4);
+  --scalar-scrollbar-color: rgba(238, 241, 235, 0.18);
+  --scalar-scrollbar-color-active: rgba(238, 241, 235, 0.36);
+  --scalar-tooltip-background: var(--paper);
+  --scalar-tooltip-color: var(--ink);
+
+  --scalar-sidebar-background-1: var(--ink);
+  --scalar-sidebar-color-1: var(--paper);
+  --scalar-sidebar-color-2: #abb0ab;
+  --scalar-sidebar-color-active: var(--paper);
+  --scalar-sidebar-border-color: rgba(238, 241, 235, 0.12);
+  --scalar-sidebar-item-hover-background: rgba(238, 241, 235, 0.05);
+  --scalar-sidebar-item-hover-color: var(--paper);
+  --scalar-sidebar-item-active-background: #172019;
+  --scalar-sidebar-indent-border: rgba(238, 241, 235, 0.12);
+  --scalar-sidebar-indent-border-hover: rgba(238, 241, 235, 0.3);
+  --scalar-sidebar-indent-border-active: var(--brass);
+  --scalar-sidebar-search-background: #172019;
+  --scalar-sidebar-search-color: #8e938f;
+  --scalar-sidebar-search-border-color: rgba(238, 241, 235, 0.14);
+}
+
+/* ---------- page ground and static chrome ---------- */
+html,
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+}
+html.ag-dark,
+html.ag-dark body {
+  background: var(--ink);
+  color: var(--paper);
+}
+body {
+  font-family: var(--ag-sans);
+  -webkit-font-smoothing: antialiased;
+}
+/* Reserve the viewport until Scalar mounts, so the footer doesn't paint under the header and jump. */
+#ag-reference {
+  display: block;
+  min-height: calc(100vh - var(--ag-header-h));
+  /* Scalar's heading "copy link" buttons overhang the column by a few px at 390; clip, don't scroll.
+   * clip (not hidden) creates no scroll container, so the sticky sidebar keeps working. */
+  overflow-x: clip;
+}
+.ag-fonts-pending .ag-header,
+.ag-fonts-pending .ag-footer {
+  visibility: hidden;
+}
+
+.ag-skip {
+  position: absolute;
+  left: 12px;
+  top: -48px;
+  z-index: 100;
+  background: var(--brass);
+  color: var(--ink);
+  padding: 8px 12px;
+  border-radius: 3px;
+  font-weight: 600;
+  text-decoration: none;
+}
+.ag-skip:focus {
+  top: 8px;
+}
+
+.ag-header {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  height: var(--ag-header-h);
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  /* left edge lines up with the sidebar's text column, right edge with the landing's 40px gutter */
+  padding: 0 40px 0 20px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--rule);
+}
+html.ag-dark .ag-header {
+  background: var(--ink);
+  border-bottom-color: rgba(238, 241, 235, 0.12);
+}
+
+/* the wordmark: "arc", a brass gatebar, "gate", then a mono suffix (".dev" on the landing) */
+.ag-mark {
+  display: inline-flex;
+  align-items: baseline;
+  color: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.ag-word {
+  font-weight: 600;
+  font-size: 23px;
+  letter-spacing: -0.035em;
+}
+.ag-gatebar {
+  display: inline-block;
+  width: 2.5px;
+  height: 19px;
+  margin: 0 3px;
+  background: var(--brass);
+  transform: translateY(3px);
+}
+.ag-suffix {
+  font-family: var(--ag-mono);
+  font-stretch: 87.5%;
+  font-size: 12px;
+  margin-left: 4px;
+  color: var(--muted);
+}
+html.ag-dark .ag-suffix {
+  color: rgba(238, 241, 235, 0.62);
+}
+.ag-mark-sm .ag-word {
+  font-size: 19px;
+}
+.ag-mark-sm .ag-gatebar {
+  height: 15px;
+  transform: translateY(2px);
+}
+
+.ag-nav {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  font-size: 14px;
+}
+.ag-nav a,
+.ag-foot-nav a {
+  color: inherit;
+  text-decoration: none;
+}
+.ag-nav a:hover,
+.ag-foot-nav a:hover,
+.ag-nav .ag-current {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-color: var(--rule2);
+}
+.ag-nav a:hover,
+.ag-foot-nav a:hover {
+  text-decoration-color: currentColor;
+}
+.ag-nav .ag-current {
+  font-weight: 600;
+}
+html.ag-dark .ag-nav .ag-current {
+  text-decoration-color: rgba(238, 241, 235, 0.32);
+}
+.ag-header a:focus-visible,
+.ag-footer a:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 3px;
+  border-radius: 1px;
+}
+
+.ag-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 36px 40px 44px 20px;
+  border-top: 1px solid var(--ink);
+  box-shadow: inset 0 3px 0 -2px var(--ink);
+  position: relative;
+  z-index: 1;
+  background: var(--paper);
+}
+html.ag-dark .ag-footer {
+  background: var(--ink);
+  border-top-color: rgba(238, 241, 235, 0.5);
+  box-shadow: inset 0 3px 0 -2px rgba(238, 241, 235, 0.5);
+}
+.ag-foot-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 24px;
+  font-size: 14px;
+}
+.ag-foot-nav a {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-color: var(--rule2);
+}
+.ag-chain {
+  font-family: var(--ag-mono);
+  font-stretch: 87.5%;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--muted);
+}
+html.ag-dark .ag-chain {
+  color: rgba(238, 241, 235, 0.62);
+}
+
+@media (max-width: 720px) {
+  /* On phones only Scalar's section bar (menu + current section) stays pinned; our header scrolls
+   * away with the page instead of stacking 106px of chrome. */
+  :root {
+    --scalar-custom-header-height: 0px;
+  }
+  .ag-header {
+    position: relative;
+    padding: 0 20px;
+  }
+  /* Scalar sizes its open menu to the full viewport, but at the top of the page our header still
+   * takes the first 56px; keep the whole menu (down to the mode toggle) on screen. */
+  .scalar-app .t-doc__header {
+    max-height: calc(100dvh - var(--ag-header-h));
+  }
+  .scalar-app .t-doc__header .t-doc__sidebar {
+    max-height: calc(100dvh - var(--ag-header-h) - 50px);
+  }
+  .ag-footer {
+    padding: 28px 20px 36px;
+  }
+  .ag-hide-sm {
+    display: none;
+  }
+}
+
+/* ---------- Scalar: type and structure ---------- */
+.scalar-app {
+  font-family: var(--ag-sans);
+}
+.scalar-app code,
+.scalar-app pre,
+.scalar-app kbd,
+.scalar-app .font-code {
+  font-family: var(--ag-mono);
+  font-stretch: 87.5%;
+  font-variant-numeric: tabular-nums;
+}
+.scalar-app h1,
+.scalar-app h2,
+.scalar-app h3,
+.scalar-app .section-header,
+.scalar-app .section-header-label {
+  letter-spacing: -0.028em;
+}
+.scalar-app .section-header,
+.scalar-app h1.section-header {
+  font-weight: 700;
+}
+.scalar-app .section-header-label {
+  font-weight: 700;
+  line-height: 1.06;
+}
+.scalar-app .operation-title {
+  line-height: 1.08;
+}
+.scalar-app .operation-title .section-header-label {
+  font-size: 34px;
+  letter-spacing: -0.028em;
+}
+@media (max-width: 720px) {
+  .scalar-app .operation-title .section-header-label {
+    font-size: 26px;
+  }
+}
+/* sections take focus on hash navigation; the focus ring drew stray full-height rules */
+.scalar-app section[tabindex="-1"]:focus,
+.scalar-app [tabindex="-1"]:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ---------- Scalar chrome that doesn't belong on arcgate ---------- */
+/* "Powered by Scalar" (MIT-licensed; attribution is not required on the rendered page) */
+.references-sidebar a[href*="scalar.com"],
+/* license/contact strip beside the title: the spec says UNLICENSED, which reads as a warning here */
+.introduction-section .section-header-wrapper > .custom-scroll,
+/* the x402 scheme is not an auth type to pick; the intro explains payment instead */
+.scalar-reference-intro-auth {
+  display: none !important;
+}
+
+
+/* "Auth Required" on paid operations: say what it actually is */
+.security-requirement-badge > span {
+  display: none;
+}
+.security-requirement-badge::after {
+  content: "x402 · paid per call";
+  font-family: var(--ag-mono);
+  font-stretch: 87.5%;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+.security-requirement-badge {
+  border: 1px solid var(--scalar-color-accent);
+  color: var(--scalar-color-accent) !important;
+  border-radius: 2px;
+  padding: 3px 8px;
+}
+.security-requirement-badge svg {
+  display: none;
+}
+
+/* ---------- method colors: brass = paid verbs, note green = free (the landing's pricing "free") ---------- */
+.light-mode {
+  --ag-post: var(--ag-brass-text);
+  --ag-get: var(--ag-note-text);
+}
+.dark-mode {
+  --ag-post: var(--brass);
+  --ag-get: #6cc79a;
+}
+.sidebar-heading-type--post,
+[class*="method--post"] {
+  --method-color: var(--ag-post) !important;
+}
+.sidebar-heading-type--get,
+[class*="method--get"] {
+  --method-color: var(--ag-get) !important;
+}
+.sidebar-heading-type {
+  font-family: var(--ag-mono);
+  font-stretch: 87.5%;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+/* ---------- sidebar: hairlines, brass active bar (the landing's verified-row left border) ---------- */
+.references-sidebar .sidebar-heading-type-active,
+.references-sidebar a[aria-current="page"],
+.references-sidebar [aria-selected="true"] {
+  font-weight: 600;
+}
+.references-sidebar .t-doc__sidebar,
+.references-sidebar aside {
+  border-right-color: var(--scalar-sidebar-border-color);
+}
+.references-sidebar a.font-sidebar-active,
+.references-sidebar .font-sidebar-active {
+  box-shadow: inset 2px 0 0 var(--brass);
+  border-radius: 0 2px 2px 0;
+}
+
+/* ---------- intro: badges as mono chips ---------- */
+.introduction-section .badge,
+.introduction-section .badge * {
+  font-size: 11px !important;
+}
+.introduction-section .badge {
+  font-family: var(--ag-mono);
+  font-stretch: 87.5%;
+  border-radius: 2px;
+  border-style: dashed;
+  border-color: var(--rule2);
+  background: transparent;
+  color: var(--scalar-color-2);
+}
+.dark-mode .introduction-section .badge {
+  border-color: rgba(238, 241, 235, 0.25);
+}
+
+/* ---------- markdown ---------- */
+.scalar-app .markdown {
+  --markdown-spacing: 1em;
+}
+.scalar-app .markdown h1,
+.scalar-app .markdown h2 {
+  font-weight: 700;
+  letter-spacing: -0.028em;
+}
+/* inline code the way the landing sets it: mono, a size down, full ink, no box */
+.scalar-app .markdown :not(pre) > code {
+  font-size: 0.8em;
+  background: transparent;
+  border: 0;
+  padding: 0;
+  box-shadow: none;
+  color: var(--scalar-color-1);
+  font-weight: 500;
+}
+.scalar-app .markdown table {
+  border-collapse: collapse;
+  width: 100%;
+  table-layout: auto;
+  border: 0;
+  border-top: 1px solid var(--scalar-color-1);
+  box-shadow: none;
+  border-radius: 0;
+}
+.scalar-app .markdown th,
+.scalar-app .markdown td {
+  border: 0;
+  border-bottom: 1px solid var(--scalar-border-color);
+  background: transparent;
+  padding: 10px 10px 10px 0;
+  text-align: left;
+}
+.scalar-app .markdown th {
+  font-family: var(--ag-mono);
+  font-stretch: 87.5%;
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  font-weight: 400;
+  color: var(--scalar-color-2);
+}
+.scalar-app .markdown td:last-child,
+.scalar-app .markdown th:last-child {
+  text-align: right;
+  font-family: var(--ag-mono);
+  font-stretch: 87.5%;
+  font-variant-numeric: tabular-nums;
+  padding-right: 0;
+}
+.scalar-app .markdown tr:last-child td:last-child {
+  color: var(--scalar-color-green);
+  font-weight: 600;
+}
+
+/* The pipeline rail: the landing's Pipeline in its narrow (stacked) form. Scalar's sanitizer strips
+ * classes, so the rail is recognised by shape: an <ol> whose items open with <code> then <strong>. */
+.scalar-app .markdown ol:has(> li:first-child > code:first-child + strong) {
+  list-style: none;
+  padding: 0;
+  margin: 1.4em 0 1.6em;
+  position: relative;
+}
+.scalar-app .markdown ol:has(> li:first-child > code:first-child + strong)::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 8px;
+  bottom: 58px;
+  width: 1.5px;
+  background: var(--scalar-color-1);
+}
+.scalar-app .markdown ol:has(> li:first-child > code:first-child + strong) > li {
+  position: relative;
+  padding: 0 0 22px 32px;
+  margin: 0;
+}
+.scalar-app .markdown ol:has(> li:first-child > code:first-child + strong) > li::marker {
+  content: none;
+}
+.scalar-app .markdown ol:has(> li:first-child > code:first-child + strong) > li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 5px;
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--scalar-color-1);
+  border-radius: 50%;
+  background: var(--scalar-background-1);
+  z-index: 1;
+}
+.scalar-app .markdown ol:has(> li:first-child > code:first-child + strong) > li:last-child {
+  padding-bottom: 0;
+  padding-top: 18px;
+  border-top: 1px dashed var(--scalar-color-1);
+}
+.scalar-app .markdown ol:has(> li:first-child > code:first-child + strong) > li:last-child::before {
+  top: 23px;
+  border-style: dashed;
+}
+.scalar-app .markdown ol:has(> li:first-child > code:first-child + strong) > li > code:first-child {
+  display: block;
+  border: 0;
+  padding: 0;
+  font-size: 12px;
+  color: var(--scalar-color-2);
+  font-weight: 500;
+  line-height: 1.5;
+}
+.scalar-app .markdown ol:has(> li:first-child > code:first-child + strong) > li > strong {
+  display: block;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.018em;
+  line-height: 1.15;
+  margin-top: 4px;
+}
+.scalar-app .markdown ol:has(> li:first-child > code:first-child + strong) > li > span {
+  display: block;
+  font-size: 14.5px;
+  line-height: 1.5;
+  color: var(--scalar-color-2);
+  margin-top: 6px;
+}
+
+/* ---------- the ink code panel (CodeSection .codebox), in both modes ---------- */
+.scalar-app .request-card,
+.scalar-app .response-card,
+.scalar-app .markdown pre {
+  --scalar-background-1: var(--ag-panel);
+  --scalar-background-2: var(--ag-panel);
+  --scalar-background-3: var(--ag-panel-2);
+  --scalar-background-4: #212b26;
+  --scalar-color-1: var(--ag-panel-1);
+  --scalar-color-2: #abb0ab;
+  --scalar-color-3: #8e938f;
+  --scalar-color-accent: var(--brass);
+  --scalar-border-color: var(--ag-panel-line);
+  --scalar-color-green: var(--ag-panel-g);
+  --scalar-color-red: #e8625c;
+  --scalar-color-orange: var(--brass);
+  --scalar-color-yellow: var(--brass);
+  --scalar-color-blue: #c9cec8;
+  --scalar-color-purple: #c9cec8;
+  --scalar-link-color: var(--ag-panel-1);
+  --ag-post: var(--brass);
+  --ag-get: var(--ag-panel-g);
+  color-scheme: dark;
+  background: var(--ag-panel);
+  color: var(--ag-panel-1);
+  border: 1px solid var(--ag-panel-line);
+  border-radius: 3px;
+}
+.dark-mode .scalar-app .request-card,
+.dark-mode .scalar-app .response-card,
+.dark-mode .scalar-app .markdown pre {
+  border-color: rgba(238, 241, 235, 0.16);
+}
+/* card headers read like the landing's panel captions: small mono, muted */
+.scalar-app .request-card .scalar-card-header,
+.scalar-app .request-card .scalar-card-header *,
+.scalar-app .response-card .scalar-card-header,
+.scalar-app .response-card .scalar-card-header * {
+  font-family: var(--ag-mono);
+  font-stretch: 87.5%;
+  font-size: 11.5px;
+}
+.scalar-app .request-card .scalar-card-header,
+.scalar-app .response-card .scalar-card-header {
+  color: rgba(238, 241, 235, 0.62);
+}
+.scalar-app :is(.request-card, .response-card) pre,
+.scalar-app :is(.request-card, .response-card) code {
+  font-size: 12px;
+  line-height: 1.7;
+}
+.scalar-app .markdown pre {
+  padding: 18px 20px;
+  font-size: 12.5px;
+  line-height: 1.75;
+  overflow-x: auto;
+}
+.scalar-app .markdown pre code,
+.scalar-app .markdown pre code.hljs {
+  border: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.75;
+  white-space: pre;
+}
+@media (max-width: 720px) {
+  /* the landing's mobile code size (.codebox pre at 900px and below) */
+  .scalar-app .markdown pre code,
+  .scalar-app .markdown pre code.hljs {
+    font-size: 11.5px;
+  }
+}
+
+/* syntax: the landing's four inks. keywords .k, strings .s, comments .c, values .g */
+.scalar-app .request-card .hljs,
+.scalar-app .response-card .hljs,
+.scalar-app .markdown pre .hljs,
+.scalar-app .markdown pre code {
+  color: var(--ag-panel-1);
+}
+.scalar-app :is(.request-card, .response-card, .markdown pre) :is(.hljs-keyword, .hljs-built_in, .hljs-title, .hljs-title.function_, .hljs-title.class_, .hljs-meta, .hljs-attr, .hljs-attribute, .hljs-params, .hljs-variable, .hljs-property, .hljs-punctuation, .hljs-operator) {
+  color: var(--ag-panel-k);
+}
+.scalar-app :is(.request-card, .response-card, .markdown pre) :is(.hljs-string, .hljs-regexp, .hljs-subst, .hljs-template-variable, .hljs-name) {
+  color: var(--ag-panel-1);
+}
+.scalar-app :is(.request-card, .response-card, .markdown pre) :is(.hljs-comment, .hljs-quote) {
+  color: var(--ag-panel-c);
+  font-style: normal;
+}
+.scalar-app :is(.request-card, .response-card, .markdown pre) :is(.hljs-number, .hljs-literal, .hljs-symbol, .hljs-bullet, .hljs-addition) {
+  color: var(--ag-panel-g);
+}
+.scalar-app :is(.request-card, .response-card) .line-numbers,
+.scalar-app :is(.request-card, .response-card) .hljs .line:before {
+  color: rgba(238, 241, 235, 0.5); /* 4.8:1 on ink */
+}
+
