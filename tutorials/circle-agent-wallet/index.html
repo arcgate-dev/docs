@@ -449,11 +449,12 @@ Arc mainnet. Treat them with more care than the testnet credentials above, not l
 swap call, and the round-2 paid re-sign with the permit attached), so the balance check requires
 <code>ARCGATE_MAX_PAYMENT * 4</code> instead of <code>* 3</code>.</p>
 <h2 id="next-steps">Next steps</h2>
-<p><a href="../metamask-embedded-wallet/">Tutorial 2</a> uses a MetaMask Embedded Wallet instead, and runs the
-default Permit2 flow end to end locally: a viem wallet signs for any chain, so it doesn&#39;t hit the
-chain split in <a href="#sign-and-broadcast">step 8</a>. arcgate also exposes an MCP endpoint
-(<code>/trade/v1/mcp</code>) and an agent skill (<code>skills/arcgate-trade/SKILL.md</code>) for the same API, if an
-agent framework is a better fit than raw HTTP calls.</p>
+<p><a href="../metamask-agent-wallet/">Tutorial 2</a> uses MetaMask Agent Wallet 7.0.0 and the MetaMask skills
+for Claude Code: <code>mm</code> signs both x402 authorizations and Permit2 permits, decodes swap calldata,
+and checks the returned transactions. Its localnet proof uses an impersonated broadcaster;
+real MetaMask mainnet submission is a separate launch check. arcgate also exposes an MCP
+endpoint (<code>/trade/v1/mcp</code>) and an agent skill
+(<code>skills/arcgate-trade/SKILL.md</code>) for the same API.</p>
 
         </article>
       </div>

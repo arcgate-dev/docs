@@ -6,7 +6,7 @@
 // Env:
 //   PRIVATE_KEY          the wallet that pays the fee, holding USDC on Arc (search, quote, swap)
 //   ARCGATE_MAX_PAYMENT  largest single payment allowed, in USDC (default 0.05)
-//   ARCGATE_API_URL      default https://api.arcgate.dev
+//   API_URL              default https://api.arcgate.dev
 //
 // Prints one JSON object, { status, body, payment }, where payment is the settlement receipt of a
 // paid call. Exits 1 when status is 400 or above, 2 on a usage error.
@@ -87,7 +87,7 @@ async function main(argv, env) {
     }
     fetchFn = payingFetch(privateKeyToAccount(key), parseUnits(env.ARCGATE_MAX_PAYMENT?.trim() || "0.05", 6));
   }
-  const apiUrl = (env.ARCGATE_API_URL?.trim() || "https://api.arcgate.dev").replace(/\/+$/, "");
+  const apiUrl = (env.API_URL?.trim() || "https://api.arcgate.dev").replace(/\/+$/, "");
   try {
     const result = await call({ fetchFn, apiUrl, operation, body });
     console.log(JSON.stringify(result, null, 2));

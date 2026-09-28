@@ -48,7 +48,7 @@ node scripts/arcgate.mjs swap '{"quoteId":"q_…","taker":"0x…","approval":"ap
 
 It prints one JSON object: `{ "status", "body", "payment" }`, where `payment` is the settlement
 receipt of a paid call. It exits non-zero when `status` is 400 or above.
-`ARCGATE_API_URL` points it at another deployment.
+`API_URL` points it at another deployment.
 
 ## 2. Settle the direction before anything else
 
