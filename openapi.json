@@ -2163,12 +2163,12 @@
         "tags": [
           "trade"
         ],
-        "summary": "List supported/excluded DEX venues and hubs",
-        "description": "Lists the DEX venues, hub tokens and launchpads this deployment indexes.\n\n- **Cost:** free, never x402-gated.\n- **Returns:** each venue with an `executable` flag, excluded venues with reasons, hubs and launchpads.\n- **Next:** use venue ids in POST /trade/v1/quote's `venues` / `excludeVenues`.",
+        "summary": "List supported DEX venues and hubs",
+        "description": "Lists the DEX venues, hub tokens and launchpads this deployment indexes.\n\n- **Cost:** free, never x402-gated.\n- **Returns:** each venue with an `executable` flag, hubs and launchpads.\n- **Next:** use venue ids in POST /trade/v1/quote's `venues` / `excludeVenues`.",
         "security": [],
         "responses": {
           "200": {
-            "description": "Configured venues, excluded venues (with reasons), hubs and launchpads.",
+            "description": "Configured venues, hubs and launchpads.",
             "content": {
               "application/json": {
                 "schema": {
@@ -2274,44 +2274,6 @@
                             "evidence": "Factory non-empty code; factory.getPool(WETH,USDC,50) returns 0x6f302decb49fb30b2d2c609bdd16e04e7dd096fc, the documented WETH/USDC fixture pool.",
                             "at": "2026-09-23"
                           }
-                        }
-                      ],
-                      "excluded": [
-                        {
-                          "id": "sushiswap_v2",
-                          "reason": "under 1% overall and 0% on quoted pairs (P8 venue census, 2026-09-23)"
-                        },
-                        {
-                          "id": "sushiswap_v3",
-                          "reason": "under 1% overall and 0% on quoted pairs (P8 venue census, 2026-09-23)"
-                        },
-                        {
-                          "id": "synthra",
-                          "reason": "v3-style, 0.15% of top-80-pool volume (P8 venue census, 2026-09-23)"
-                        },
-                        {
-                          "id": "dyorswap",
-                          "reason": "V2-style, 0.14% of top-80-pool volume (P8 venue census, 2026-09-23)"
-                        },
-                        {
-                          "id": "curve",
-                          "reason": "no pools deployed on Arc (P8 venue census, 2026-09-23)"
-                        },
-                        {
-                          "id": "fluid",
-                          "reason": "not deployed on Arc (P8 venue census, 2026-09-23)"
-                        },
-                        {
-                          "id": "lunya",
-                          "reason": "pending interface identification; missing from GeckoTerminal but KyberSwap routes EURC/cirBTC sells through it"
-                        },
-                        {
-                          "id": "foci_curve",
-                          "reason": "bonding curve not supported in MVP (unsupported_venue); graduated Foci pools are supported through uniswap_v4"
-                        },
-                        {
-                          "id": "arctide",
-                          "reason": "JavaScript-only frontend, no published contracts, did not appear in the 2026-09-23 top-80-pool census"
                         }
                       ],
                       "hubs": [
@@ -2618,7 +2580,7 @@
           "service"
         ],
         "summary": "Liveness, cache and RPC diagnostics",
-        "description": "Reports whether the service is up, with its diagnostics.\n\n- **Cost:** free, never x402-gated.\n- **Returns:** DB import health, rule set version, cache/RPC/spend counters and the payer-identity mode.\n- **Next:** call before search/quote/swap to check the service is up.",
+        "description": "Reports whether the service is up, with its diagnostics.\n\n- **Cost:** free, never x402-gated.\n- **Returns:** DB import health, rule set version, the deployed commit, cache/RPC/spend counters and the payer-identity mode.\n- **Next:** call before search/quote/swap to check the service is up.",
         "security": [],
         "responses": {
           "200": {
@@ -2640,6 +2602,7 @@
                         "importedAt": 1790388601
                       },
                       "rulesVersion": "r2-383954828c",
+                      "commit": "781fef165e1744898169ddb4b258443f9b3d94da",
                       "caches": {
                         "response": {
                           "hits": 0,
@@ -3955,10 +3918,6 @@
               "$ref": "#/components/schemas/VenueSummaryOut"
             }
           },
-          "excluded": {
-            "type": "array",
-            "items": {}
-          },
           "hubs": {
             "type": "array",
             "items": {}
@@ -3970,7 +3929,6 @@
         },
         "required": [
           "venues",
-          "excluded",
           "hubs",
           "launchpads"
         ],
@@ -4021,6 +3979,16 @@
           },
           "rulesVersion": {
             "type": "string"
+          },
+          "commit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "caches": {},
           "rpc": {
@@ -4085,6 +4053,7 @@
           "ok",
           "db",
           "rulesVersion",
+          "commit",
           "caches",
           "rpc",
           "spend",
