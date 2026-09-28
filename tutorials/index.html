@@ -38,7 +38,6 @@
       <nav class="ag-nav" aria-label="arcgate">
         <a class="ag-hide-sm" href="../#arcgate/description/prices">Pricing</a>
         <a class="ag-hide-sm" href="https://arcgate.dev/">arcgate.dev</a>
-        <a class="ag-current" href="../tutorials/" aria-current="page">Tutorials</a>
         <a href="../">API reference</a>
         <button type="button" class="ag-mode-toggle" data-ag-mode-toggle aria-label="Toggle dark mode"><span data-ag-mode-label>Dark</span></button>
       </nav>
@@ -47,29 +46,12 @@
       <div class="ag-tut-index">
         <h1>Tutorials</h1>
         <ul class="ag-tut-cards">
-          <li class="ag-tut-card">
-          <a href="./circle-agent-wallet/">
-            <h2>Trade through arcgate with a Circle agent wallet</h2>
-            <p>Pay x402 on Arc testnet with a Circle Developer-Controlled Wallet, then search, quote, and swap on Arc mainnet.</p>
-            <p class="ag-tut-card-wallet">Circle agent wallet</p>
-            
-          </a>
-        </li>
-<li class="ag-tut-card">
-          <a href="./metamask-agent-wallet/">
-            <h2>Trade through arcgate with MetaMask Agent Wallet</h2>
-            <p>Use Claude Code with the MetaMask skills and mm 7.0.0 to pay x402 on Arc testnet, then search, quote, sign Permit2, decode, and send an Arc mainnet swap.</p>
-            <p class="ag-tut-card-wallet">MetaMask Agent Wallet</p>
-            
-          </a>
-        </li>
+          <li class="ag-tut-card ag-tut-empty"><p>No tutorials are published yet.</p></li>
           <li class="ag-tut-card ag-tut-card-agent">
           <h2>Using arcgate from an agent</h2>
           <p>arcgate is also a paid MCP server at <code>POST /trade/v1/mcp</code> (Model Context
           Protocol): an x402-aware MCP client calls search, quote, swap and venues as tools, at the
-          same prices. Agents that take plain-English orders can load the
-          <code>arcgate-trade</code> skill at <code>skills/arcgate-trade/SKILL.md</code> in the
-          repository. See <a href="../#arcgate/description/mcp-for-agents">MCP for agents</a> in the reference.</p>
+          same prices. See <a href="../#arcgate/description/mcp-for-agents">MCP for agents</a> in the reference.</p>
         </li>
         </ul>
       </div>
