@@ -38,6 +38,7 @@
       <nav class="ag-nav" aria-label="arcgate">
         <a class="ag-hide-sm" href="../#arcgate/description/prices">Pricing</a>
         <a class="ag-hide-sm" href="https://arcgate.dev/">arcgate.dev</a>
+        <a class="ag-current" href="../tutorials/" aria-current="page">Tutorials</a>
         <a href="../">API reference</a>
         <button type="button" class="ag-mode-toggle" data-ag-mode-toggle aria-label="Toggle dark mode"><span data-ag-mode-label>Dark</span></button>
       </nav>
@@ -46,7 +47,14 @@
       <div class="ag-tut-index">
         <h1>Tutorials</h1>
         <ul class="ag-tut-cards">
-          <li class="ag-tut-card ag-tut-empty"><p>No tutorials are published yet.</p></li>
+          <li class="ag-tut-card">
+          <a href="./circle-agent-wallet/">
+            <h2>Trade through arcgate with a Circle agent wallet</h2>
+            <p>Connect a Circle Developer-Controlled Wallet to api.arcgate.dev, pay x402, and trade on Arc mainnet.</p>
+            <p class="ag-tut-card-wallet">Circle agent wallet</p>
+            
+          </a>
+        </li>
           <li class="ag-tut-card ag-tut-card-agent">
           <h2>Using arcgate from an agent</h2>
           <p>arcgate is also a paid MCP server at <code>POST /trade/v1/mcp</code> (Model Context

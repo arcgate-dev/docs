@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Trade through arcgate with a Circle agent wallet · arcgate docs</title>
+    <meta name="description" content="Connect a Circle Developer-Controlled Wallet to api.arcgate.dev, pay x402, and trade on Arc mainnet." />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#EEF1EB" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#101815" media="(prefers-color-scheme: dark)" />
+    <link rel="canonical" href="https://docs.arcgate.dev/tutorials/circle-agent-wallet/" />
+
+    <link rel="icon" href="../../favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="../../favicon.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="../../apple-touch-icon.png" />
+
+    <link rel="preload" href="../../fonts/schibsted-grotesk-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="../../fonts/schibsted-grotesk-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="../../fonts/martian-mono-latin-wdth-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="../../theme.css" />
+    <link rel="stylesheet" href="../../tutorials.css" />
+    <script>
+      (function () {
+        var root = document.documentElement;
+        var stored = null;
+        try { stored = localStorage.getItem("colorMode"); } catch (e) {}
+        var dark = stored === "dark" || (stored !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+        if (dark) root.classList.add("ag-dark");
+      })();
+    </script>
+  </head>
+  <body>
+    <a class="ag-skip" href="#ag-tut-article">Skip to the article</a>
+    <header class="ag-header">
+      <a class="ag-mark" href="https://arcgate.dev/" aria-label="arcgate.dev home">
+        <span class="ag-word">arc</span><span class="ag-gatebar" aria-hidden="true"></span><span class="ag-word">gate</span><span class="ag-suffix">docs</span>
+      </a>
+      <nav class="ag-nav" aria-label="arcgate">
+        <a class="ag-hide-sm" href="../../#arcgate/description/prices">Pricing</a>
+        <a class="ag-hide-sm" href="https://arcgate.dev/">arcgate.dev</a>
+        <a class="ag-current" href="../../tutorials/" aria-current="page">Tutorials</a>
+        <a href="../../">API reference</a>
+        <button type="button" class="ag-mode-toggle" data-ag-mode-toggle aria-label="Toggle dark mode"><span data-ag-mode-label>Dark</span></button>
+      </nav>
+    </header>
+    <main id="ag-tut-article" class="ag-tut-main">
+      <div class="ag-tut-grid">
+        <header class="ag-tut-prose ag-tut-head">
+          <h1 id="ag-tut-title">Trade through arcgate with a Circle agent wallet</h1>
+          <p class="ag-tut-description">Connect a Circle Developer-Controlled Wallet to api.arcgate.dev, pay x402, and trade on Arc mainnet.</p>
+          <p class="ag-tut-wallet">Circle agent wallet</p>
+          
+        </header>
+        <nav class="ag-tut-toc" aria-label="On this page">
+    <details class="ag-tut-toc-mobile" open>
+      <summary>On this page</summary>
+      <ol><li><a href="#before-you-start">Before you start</a></li>
+<li><a href="#install-the-tutorial">1. Install the tutorial</a></li>
+<li><a href="#connect-your-circle-wallet">2. Connect your Circle wallet</a></li>
+<li><a href="#pay-for-a-search">3. Pay for a search</a></li>
+<li><a href="#get-a-quote">4. Get a quote</a></li>
+<li><a href="#inspect-the-swap">5. Inspect the swap</a></li>
+<li><a href="#send-the-trade-through-circle">6. Send the trade through Circle</a></li>
+<li><a href="#troubleshooting">Troubleshooting</a></li>
+<li><a href="#tests-and-verification">Tests and verification</a></li></ol>
+    </details>
+  </nav>
+        <article class="ag-tut-prose ag-tut-body" aria-labelledby="ag-tut-title">
+          <p>Use your own Circle wallet to call <strong><a href="https://api.arcgate.dev">https://api.arcgate.dev</a></strong>. You will connect the wallet, pay for a token search with x402, quote 1 USDC for cirBTC, inspect the unsigned swap, and optionally send it through Circle.</p>
+<p>The complete runnable example is in the public <a href="https://github.com/arcgate-dev/tutorials/tree/main/arc-circle">arcgate-dev/tutorials repository</a>. The dependencies are the public Circle SDK, x402 SDK, and viem. Arcgate does not need an API key: your wallet pays per call. Your Circle credentials go to Circle, never to Arcgate.</p>
+<p><strong>Verified on Arc mainnet, September 29, 2026 (UTC):</strong> the published commands paid through x402, previewed the swap, and used Circle to approve and trade 0.50 USDC for 0.00000598 cirBTC. See <a href="https://github.com/arcgate-dev/tutorials/blob/main/arc-circle/VALIDATION.md">the validation record and transaction receipts</a>.</p>
+<h2 id="before-you-start">Before you start</h2>
+<ul>
+<li><strong>Node.js 22.9 or newer</strong>, npm, and Git.</li>
+<li>A <a href="https://console.circle.com">Circle developer account</a> with mainnet access.</li>
+<li>A <strong>developer-controlled EOA wallet on <code>ARC</code></strong>, a live API key, and the entity secret registered for that account. A user-controlled wallet or smart contract account needs a different integration.</li>
+<li>USDC on <strong>Arc mainnet, chain <code>5042</code></strong>. API payments and swaps both use this network on the public service. <code>ARC-TESTNET</code> wallets and faucet USDC cannot pay it.</li>
+</ul>
+<p>This walkthrough uses real funds. Its default limits are <strong>0.01 USDC per API call</strong>, <strong>0.025 USDC in API fees per command</strong>, and <strong>1 USDC sold per trade</strong>. Gas is additional and also paid in USDC. Fund a dedicated wallet with enough for those amounts plus gas; 2 USDC gives headroom for the 1 USDC example, but gas costs vary.</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>What it does</th>
+<th>API fees at the current prices</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>npm run inspect</code></td>
+<td>Checks service health and displays an unpaid payment request</td>
+<td>Free</td>
+</tr>
+<tr>
+<td><code>npm run connect</code></td>
+<td>Reads your Circle wallet and its USDC balance</td>
+<td>Free</td>
+</tr>
+<tr>
+<td><code>npm run search</code></td>
+<td>Resolves cirBTC</td>
+<td>0.005 USDC</td>
+</tr>
+<tr>
+<td><code>npm run quote</code></td>
+<td>Searches, then quotes 1 USDC</td>
+<td>0.015 USDC total</td>
+</tr>
+<tr>
+<td><code>npm run preview</code></td>
+<td>Searches, quotes, and builds an unsigned swap</td>
+<td>0.025 USDC total</td>
+</tr>
+<tr>
+<td><code>npm run trade -- --execute</code></td>
+<td>Runs the same three calls, then broadcasts</td>
+<td>0.025 USDC, plus the trade and gas</td>
+</tr>
+</tbody></table>
+<p>Each command starts a new run. Running all four paid commands costs 0.07 USDC in API fees. A preview pays for its API calls even though it does not send the swap. The code refuses prices above its limits.</p>
+<h2 id="install-the-tutorial" class="ag-tut-step-heading"><span class="ag-tut-step-badge" aria-hidden="true">1</span><span class="ag-tut-step-text">Install the tutorial</span></h2>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>git clone https://github.com/arcgate-dev/tutorials.git
+cd tutorials/arc-circle
+npm ci
+cp .env.example .env</code></pre></div></figure>
+<p>Run every command below from <code>tutorials/arc-circle</code>. Only this folder&#39;s <code>.env</code> is loaded. You do not need Docker or an Arcgate server.</p>
+<p>You can already inspect the public service without a wallet:</p>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>npm run inspect</code></pre></div></figure>
+<p>It checks <code>GET /health</code> and makes an unpaid <code>POST /trade/v1/search</code>. The latter returns <strong>HTTP 402</strong>, with a base64 JSON <code>PAYMENT-REQUIRED</code> header. Relevant fields from the public service on September 28, 2026:</p>
+<figure class="ag-tut-code" data-lang="json"><div class="ag-tut-code-caption ag-tut-code-lang"><span>json</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>{
+  &quot;scheme&quot;: &quot;exact&quot;,
+  &quot;network&quot;: &quot;eip155:5042&quot;,
+  &quot;amount&quot;: &quot;5000&quot;,
+  &quot;asset&quot;: &quot;0x3600000000000000000000000000000000000000&quot;,
+  &quot;payTo&quot;: &quot;0x08A4f8734ADAB08d3461E356b5A498b893Bd7B5e&quot;,
+  &quot;maxTimeoutSeconds&quot;: 300,
+  &quot;extra&quot;: { &quot;name&quot;: &quot;USDC&quot;, &quot;version&quot;: &quot;2&quot; }
+}</code></pre></div></figure>
+<p><code>amount</code> is in six-decimal USDC units: <code>5000</code> means 0.005 USDC. <code>payTo</code> is <strong>Arcgate&#39;s fee recipient</strong>, not your wallet. The example pins that address in <code>.env.example</code> and checks each offer against it before signing.</p>
+<h2 id="connect-your-circle-wallet" class="ag-tut-step-heading"><span class="ag-tut-step-badge" aria-hidden="true">2</span><span class="ag-tut-step-text">Connect your Circle wallet</span></h2>
+<p>If you already have a developer-controlled <code>ARC</code> EOA, use its existing credentials and wallet ID. Find them in <a href="https://console.circle.com">Circle Console</a>:</p>
+<figure class="ag-tut-code" data-lang="dotenv"><div class="ag-tut-code-caption ag-tut-code-lang"><span>dotenv</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code># .env — keep this file private
+CIRCLE_API_KEY=LIVE_API_KEY:your_key_here
+CIRCLE_ENTITY_SECRET=your_registered_64_character_hex_secret
+CIRCLE_WALLET_ID=your_wallet_uuid</code></pre></div></figure>
+<p><code>CIRCLE_WALLET_ID</code> is Circle&#39;s UUID for the wallet, <strong>not</strong> its <code>0x</code> address. The API key and entity secret must belong to the account that owns it. Use the existing registered entity secret; do not generate a replacement for an existing account.</p>
+<p>For a new Circle account:</p>
+<ol>
+<li>Enable mainnet access and create a <strong>live</strong> API key in Circle Console.</li>
+<li>Generate and register an entity secret using <a href="https://developers.circle.com/wallets/dev-controlled/register-entity-secret">Circle&#39;s setup instructions</a>. Keep the recovery file outside this repository.</li>
+<li>Set <code>CIRCLE_API_KEY</code> and <code>CIRCLE_ENTITY_SECRET</code> in <code>.env</code>, leaving <code>CIRCLE_WALLET_ID</code> empty.</li>
+</ol>
+<p>Create the wallet programmatically with the included script:</p>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>npm run wallet:create</code></pre></div></figure>
+<p><a href="https://github.com/arcgate-dev/tutorials/blob/main/arc-circle/src/create-wallet.js">src/create-wallet.js</a> follows Circle&#39;s <a href="https://developers.circle.com/wallets/dev-controlled/create-your-first-wallet">Create your first developer-controlled wallet</a> guide: call <code>createWalletSet</code>, then <code>createWallets</code>. It sets <code>blockchains: [&#39;ARC&#39;]</code> and <code>accountType: &#39;EOA&#39;</code> for this mainnet tutorial. Circle&#39;s quickstart uses <code>ARC-TESTNET</code> in its example.</p>
+<p>Paste the printed <code>CIRCLE_WALLET_ID=…</code> line into <code>.env</code>. If that variable is already set, the command validates the existing wallet instead of creating another. Fund the printed address with USDC on <strong>Arc mainnet</strong>, leaving additional USDC for gas.</p>
+<p>Then connect:</p>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>npm run connect</code></pre></div></figure>
+<p>Expected shape, with your address and balance:</p>
+<figure class="ag-tut-code" data-lang="json"><div class="ag-tut-code-caption ag-tut-code-lang"><span>json</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>{
+  &quot;address&quot;: &quot;0xYourWalletAddress&quot;,
+  &quot;blockchain&quot;: &quot;ARC&quot;,
+  &quot;usdcBalance&quot;: &quot;2&quot;
+}</code></pre></div></figure>
+<p>Connecting reads the wallet and balance; it does not sign or pay. The check requires <code>accountType: &quot;EOA&quot;</code>, <code>blockchain: &quot;ARC&quot;</code>, and <code>state: &quot;LIVE&quot;</code>. <code>state: &quot;LIVE&quot;</code> means the wallet is active; the separate <code>blockchain</code> check establishes its network. Circle documents Arc support in its <a href="https://developers.circle.com/wallets/supported-blockchains">supported blockchains</a> table.</p>
+<p>The connection code is ordinary Circle SDK code, included in <a href="https://github.com/arcgate-dev/tutorials/blob/main/arc-circle/src/circle.js">src/circle.js</a>:</p>
+<figure class="ag-tut-code" data-lang="js"><div class="ag-tut-code-caption ag-tut-code-lang"><span>js</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>import { initiateDeveloperControlledWalletsClient } from &#39;@circle-fin/developer-controlled-wallets&#39;;
+
+const circle = initiateDeveloperControlledWalletsClient({
+  apiKey: process.env.CIRCLE_API_KEY,
+  entitySecret: process.env.CIRCLE_ENTITY_SECRET,
+});
+const response = await circle.getWallet({ id: process.env.CIRCLE_WALLET_ID });
+const wallet = response.data.wallet;</code></pre></div></figure>
+<h2 id="pay-for-a-search" class="ag-tut-step-heading"><span class="ag-tut-step-badge" aria-hidden="true">3</span><span class="ag-tut-step-text">Pay for a search</span></h2>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>npm run search</code></pre></div></figure>
+<p>The request is:</p>
+<figure class="ag-tut-code" data-lang="http"><div class="ag-tut-code-caption ag-tut-code-lang"><span>http</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>POST https://api.arcgate.dev/trade/v1/search
+Content-Type: application/json
+
+{&quot;query&quot;:&quot;cirBTC&quot;,&quot;limit&quot;:5}</code></pre></div></figure>
+<p><a href="https://github.com/arcgate-dev/tutorials/blob/main/arc-circle/src/payment.js">src/payment.js</a> handles the payment:</p>
+<ol>
+<li>Send the request without payment and read the 402 requirements.</li>
+<li>Check the network, USDC contract, fee recipient, amount, and authorization timeout.</li>
+<li>Ask the x402 SDK to build an <strong>EIP-3009 <code>TransferWithAuthorization</code></strong>. Its signer calls <code>circle.signTypedData({ walletId, data })</code>. Circle keeps the wallet key; the script receives a signature and verifies that it recovers to your wallet address.</li>
+<li>Retry the identical request once, with the signed payload in <code>PAYMENT-SIGNATURE</code>.</li>
+<li>Read the result and the settlement receipt in <code>PAYMENT-RESPONSE</code>.</li>
+</ol>
+<p>Arc USDC must be explicitly listed in the x402 client&#39;s <code>spendControls.allowedAssets</code>. The included client sets that allowlist as well as the per-call and total budgets.</p>
+<p>The result contains <code>resolution</code> and <code>results[]</code>, including each token&#39;s contract address, verification, and flags. This tutorial expects the verified cirBTC contract:</p>
+<figure class="ag-tut-code" data-lang="text"><div class="ag-tut-code-caption ag-tut-code-lang"><span>text</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>0x171a4217b86a807a64eb94757db6849fb4bdbaa0</code></pre></div></figure>
+<p>It stops on ambiguous results, a different address, an unverified token, or any flags. A matching ticker alone is not enough to choose a token.</p>
+<h2 id="get-a-quote" class="ag-tut-step-heading"><span class="ag-tut-step-badge" aria-hidden="true">4</span><span class="ag-tut-step-text">Get a quote</span></h2>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>npm run quote</code></pre></div></figure>
+<p>After search, the script makes this paid request:</p>
+<figure class="ag-tut-code" data-lang="http"><div class="ag-tut-code-caption ag-tut-code-lang"><span>http</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>POST https://api.arcgate.dev/trade/v1/quote
+Content-Type: application/json
+
+{
+  &quot;sell&quot;: &quot;0x3600000000000000000000000000000000000000&quot;,
+  &quot;buy&quot;: &quot;0x171a4217b86a807a64eb94757db6849fb4bdbaa0&quot;,
+  &quot;amount&quot;: &quot;1&quot;,
+  &quot;side&quot;: &quot;exactIn&quot;,
+  &quot;slippageBps&quot;: 100
+}</code></pre></div></figure>
+<p>Here <code>amount</code> is a <strong>human-readable token amount</strong>: <code>&quot;1&quot;</code> means 1 USDC. Slippage is 100 basis points, or 1%. You can lower <code>SELL_AMOUNT</code> in <code>.env</code>; the tutorial caps it at 1 USDC.</p>
+<p>The verified mainnet walkthrough used <code>SELL_AMOUNT=0.50</code>. Set that value in <code>.env</code> to follow the same trade size.</p>
+<p>The response includes <code>quoteId</code>, <code>expiresAt</code>, the tokens, routes, <code>best</code>, and <code>safety</code>. For an exact-input quote, the input is <code>sell.amount</code> / <code>sell.amountRaw</code>. <code>best.amountOutQuoted</code> and <code>best.minAmountOut</code> are human-readable output amounts. The script preserves that original minimum when it later checks the swap calldata.</p>
+<p>Quotes normally expire after 120 seconds. The preview and trade commands request a fresh quote and use it immediately. They stop if the quote is expired or the safety verdict is anything other than <code>ok</code> or <code>pinned</code>.</p>
+<h2 id="inspect-the-swap" class="ag-tut-step-heading"><span class="ag-tut-step-badge" aria-hidden="true">5</span><span class="ag-tut-step-text">Inspect the swap</span></h2>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>npm run preview</code></pre></div></figure>
+<p>This runs search and quote, then:</p>
+<figure class="ag-tut-code" data-lang="js"><div class="ag-tut-code-caption ag-tut-code-lang"><span>js</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>const swap = await api(&#39;swap&#39;, {
+  quoteId: quote.quoteId,
+  taker: wallet.address,
+  recipient: wallet.address,
+  approval: &#39;approve&#39;,
+  deadlineSec: 300,
+});</code></pre></div></figure>
+<p><code>api</code> is the paid HTTP helper from <a href="https://github.com/arcgate-dev/tutorials/blob/main/arc-circle/src/payment.js">src/payment.js</a>; <code>runFlow</code> shows all three calls together in <a href="https://github.com/arcgate-dev/tutorials/blob/main/arc-circle/src/flow.js">src/flow.js</a>.</p>
+<p><code>POST /trade/v1/swap</code> simulates the trade from your wallet, so you need the sell amount even for a preview. Arcgate returns unsigned <code>transactions[]</code>. This tutorial requests <strong><code>approval: &quot;approve&quot;</code></strong>: at most one ERC-20 approval for the exact sell amount, followed by the swap. An existing allowance or a route funded by native USDC can make the approval unnecessary. The API&#39;s default is Permit2, which can require signing a permit and making another paid <code>/swap</code> call; that is a separate approval flow.</p>
+<p>Before sending anything, <a href="https://github.com/arcgate-dev/tutorials/blob/main/arc-circle/src/guards.js">src/guards.js</a> decodes the entire transaction batch. It checks the approval spender and amount, router address, input and output tokens, sell amount, recipient, minimum output, deadline, native value, and input pull mode. The router is pinned to the public deployment:</p>
+<figure class="ag-tut-code" data-lang="text"><div class="ag-tut-code-caption ag-tut-code-lang"><span>text</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>0x6cf4f7785d479b9ec1c3abe2fb569525380baede</code></pre></div></figure>
+<p>The script prints the decoded fields and stops. <strong>No approval or swap is broadcast in preview.</strong> API fees have still been paid.</p>
+<p>Arc has two representations of USDC: ERC-20 amounts use <strong>6 decimals</strong>, while native transaction <code>value</code> uses <strong>18 decimals</strong>. The example handles both; it does not send a six-decimal integer as native value.</p>
+<p>These checks bind the transaction to the order you requested. They do not independently price the asset or audit every venue call inside the route. Review the quoted price and minimum before choosing to trade.</p>
+<h2 id="send-the-trade-through-circle" class="ag-tut-step-heading"><span class="ag-tut-step-badge" aria-hidden="true">6</span><span class="ag-tut-step-text">Send the trade through Circle</span></h2>
+<p>When you are ready to spend the configured amount:</p>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>npm run trade -- --execute</code></pre></div></figure>
+<p>This fetches a <strong>new</strong> quote and swap, applies the same checks, then asks Circle to sign and broadcast each transaction in order:</p>
+<figure class="ag-tut-code" data-lang="js"><div class="ag-tut-code-caption ag-tut-code-lang"><span>js</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>const created = await circle.createContractExecutionTransaction({
+  walletId: wallet.id,
+  contractAddress: tx.to,
+  callData: tx.data,
+  amount: formatUnits(BigInt(tx.value), 18),
+  fee: { type: &#39;level&#39;, config: { feeLevel: &#39;MEDIUM&#39; } },
+  idempotencyKey,
+});</code></pre></div></figure>
+<p>Circle&#39;s <code>amount</code> is a decimal native-currency amount, not wei. The helper in <a href="https://github.com/arcgate-dev/tutorials/blob/main/arc-circle/src/circle.js">src/circle.js</a> supplies an idempotency key, records Circle&#39;s transaction ID, waits for <code>COMPLETE</code>, and returns the transaction hash. The flow also checks the onchain receipt before sending the next transaction. An approval failure stops the swap.</p>
+<p>Finally it compares the cirBTC balance increase with both the Transfer events and the original quote&#39;s minimum. A successful run prints the settlement hashes, approval/swap hashes, and delivered amount. Prices and hashes will differ each time.</p>
+<p>Run logs are saved under <code>.runs/</code>. They contain Circle transaction IDs and onchain hashes, not credentials or reusable payment signatures. If a payment response or Circle transaction times out, the script stops instead of submitting a new payment or transaction. Inspect the recorded transaction in Circle Console and on the network before retrying. Rerunning the whole trade creates a new order and can trade again.</p>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<table>
+<thead>
+<tr>
+<th>Result</th>
+<th>What to check</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Circle 401/403 or wallet not found</td>
+<td>The API key, registered entity secret, and wallet ID must belong to the same Circle account and environment.</td>
+</tr>
+<tr>
+<td><code>ARC-TESTNET</code>, <code>TEST_API_KEY</code>, or SCA refused</td>
+<td>Use a mainnet <code>ARC</code> developer-controlled <strong>EOA</strong> and live credentials.</td>
+</tr>
+<tr>
+<td>Payment requirements differ</td>
+<td>Run <code>npm run inspect</code>. Check the public service configuration and documented addresses before changing the pinned recipient or limits.</td>
+</tr>
+<tr>
+<td>402 after signing</td>
+<td>Check USDC balance and the payment error. The script does not keep signing new payments.</td>
+</tr>
+<tr>
+<td>HTTP 410</td>
+<td>The quote expired. A new run gets a new quote and incurs new successful-call fees.</td>
+</tr>
+<tr>
+<td>HTTP 422</td>
+<td>Read the error code: the order may lack liquidity, fail simulation, or be non-executable for this wallet.</td>
+</tr>
+<tr>
+<td>Swap guard refuses a changed minimum</td>
+<td>The swap no longer preserves the earlier quote&#39;s output floor. Review a new quote.</td>
+</tr>
+<tr>
+<td>Circle timeout or <code>SENT</code></td>
+<td>A submitted transaction may still execute. Look up its recorded Circle ID before retrying.</td>
+</tr>
+<tr>
+<td>Receipt reverted</td>
+<td>Stop. Previously paid API fees and onchain gas are separate from the failed trade.</td>
+</tr>
+</tbody></table>
+<h2 id="tests-and-verification">Tests and verification</h2>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>npm test</code></pre></div></figure>
+<p>The tests use generated local signing keys and injected HTTP, Circle, and RPC responses. They require no credentials, funded wallet, or deployed service. See <a href="https://github.com/arcgate-dev/tutorials/blob/main/arc-circle/VALIDATION.md">VALIDATION.md</a> for the checks actually run and the limits of live verification.</p>
+<p>For other tokens, order sizes, approval modes, and MCP access, use the <a href="https://docs.arcgate.dev">API reference</a> and <a href="https://api.arcgate.dev/openapi.json">OpenAPI document</a>. Review the example&#39;s token and spending checks before changing its scope.</p>
+
+        </article>
+      </div>
+    </main>
+    <footer class="ag-footer">
+      <div class="ag-mark ag-mark-sm" aria-hidden="true">
+        <span class="ag-word">arc</span><span class="ag-gatebar"></span><span class="ag-word">gate</span>
+      </div>
+      <nav class="ag-foot-nav" aria-label="footer">
+        <a href="https://arcgate.dev/">arcgate.dev</a>
+        <a href="../../#arcgate/description/prices">Pricing</a>
+        <a href="https://api.arcgate.dev/health">API health</a>
+        <span class="ag-chain">Arc mainnet · chain 5042</span>
+      </nav>
+    </footer>
+    <div class="ag-sr-only" role="status" aria-live="polite" data-ag-live></div>
+    <script src="../../tutorials.js"></script>
+  </body>
+</html>
