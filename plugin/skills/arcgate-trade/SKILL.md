@@ -16,11 +16,12 @@ API: `https://api.arcgate.dev`. Reference: https://docs.arcgate.dev
 | --- | --- | --- |
 | `POST /trade/v1/search` | Resolve a ticker, name or address to tokens | 0.005 |
 | `POST /trade/v1/quote` | Price a trade, returns a `quoteId` | 0.01 |
-| `POST /trade/v1/swap` | Turn a `quoteId` into unsigned transactions | 0.01 to 5, by size |
+| `POST /trade/v1/swap` | Turn a `quoteId` into unsigned transactions | 0.01 to 5, by size, once per quote |
+| `POST /trade/v1/receipt` | Confirm the sent swap: delivered against `minAmountOut`, pass or fail | free |
 | `GET /trade/v1/venues`, `GET /health` | Venues; service status | free |
 
 The same operations are MCP tools on `POST /trade/v1/mcp`: `tradeSearch`, `tradeQuote`,
-`tradeSwap`, `tradeVenues`, `health`, with the same inputs and prices.
+`tradeSwap`, `tradeReceipt`, `tradeVenues`, `health`, with the same inputs and prices.
 
 ## 1. Paying: read this before the first paid call
 
@@ -42,7 +43,7 @@ never charged.
 ```bash
 node scripts/arcgate.mjs health
 node scripts/arcgate.mjs search '{"query":"MOLLY"}'
-node scripts/arcgate.mjs quote '{"sell":"0x3600000000000000000000000000000000000000","buy":"0x…","amount":"100"}'
+node scripts/arcgate.mjs quote '{"sell":"0x3600000000000000000000000000000000000000","buy":"0x…","amount":"100","taker":"0x…"}'
 node scripts/arcgate.mjs swap '{"quoteId":"q_…","taker":"0x…","approval":"approve"}'
 ```
 
@@ -83,7 +84,8 @@ USDC is `0x3600000000000000000000000000000000000000` (native and ERC-20 USDC are
 ## 4. Quote, and read the safety verdict
 
 `quote` takes `sell`, `buy`, `amount`, and optionally `side` (default `exactIn`) and
-`slippageBps` (default 100). Leave `venues` out: it searches every venue.
+`slippageBps` (default 100). Pass `taker` too: the wallet that will swap. Leave `venues` out: it
+searches every venue.
 
 The answer has a `quoteId`, the best route under `best` (expected output, `minAmountOut`, fees,
 `executable`) and `safety.verdict`:
@@ -99,38 +101,93 @@ The answer has a `quoteId`, the best route under `best` (expected output, `minAm
 
 If `best.executable` is `false`, the route can't be swapped: say so and stop.
 
+With `taker`, the answer also has `readiness`, checked at the quote's block. Read it before paying
+for a swap:
+
+- Tell the user `readiness.totalCostUsdc`: the swap fee plus gas, what finishing will cost.
+- If `readiness.ready` is `false` (the quote's `next` is then `stop`), stop and say what is short:
+  `balance` (not enough of the sell token), `gas` (not enough native USDC for gas) or `fees` (the
+  paying wallet can't cover the swap fee).
+- `readiness.approval.needs` says what the default Permit2 swap will ask for first: `none`,
+  `approve`, `sign_permit`, `approve_and_sign_permit`, or `native` (nothing).
+
 ## 5. Swap within two minutes
 
-A `quoteId` lives 120 seconds (`ttlSec`). After that `swap` answers `410 quote_expired`: quote
-again.
+A `quoteId` lives 120 seconds (`ttlSec`). After that `swap` answers `410 quote_expired` (see the end
+of this section).
 
 `swap` takes `{ "quoteId", "taker", "approval": "approve" }`:
 
 - **`taker`** is the wallet that will sign and send the transactions. It must hold the sell token,
   plus a little native USDC for gas (native USDC is Arc's gas token), or the answer is
-  `422 insufficient_balance`. It isn't necessarily the wallet that pays arcgate's fee.
+  `422 insufficient_balance`. It isn't necessarily the wallet that pays arcgate's fee; when it is,
+  it also needs the swap fee on top, since the fee comes out of the same USDC.
 - **`recipient`** (optional) receives the bought tokens; it defaults to `taker`.
 - **`approval: "approve"`** is always one call: at most one exact-amount ERC-20 approve, then the
-  swap. The default, `"permit2"`, can instead return a permit to sign and needs a second paid
-  `swap` call with `permit: { message, signature }`. Prefer `"approve"`.
+  swap. The default, `"permit2"`, can instead return a permit for the taker to sign
+  (`signatures[0].typedData`). Then call `swap` again with the same `quoteId`, `taker` and
+  `recipient`, plus `permit: { message, signature }` (`message` is `typedData.message`), before the
+  quote's 120 seconds run out. That second call is free: the first one paid the swap fee. Use
+  `"approve"` when the taker's wallet can't sign typed data.
 
 The answer's `transactions[]` are unsigned, for Arc mainnet (chain 5042), in order: an approve if
 needed, then the swap through arcgate's router. The user's wallet signs and sends each, in order,
 waiting for each to confirm. Show the user what they're about to sign.
 
 `swap` re-quotes and re-simulates at the current block, so a price that moved fails loudly
-(`409 quote_stale`) instead of executing worse: quote again.
+(`409 quote_stale`) instead of executing worse.
 
-## 6. Errors
+On `409 quote_stale` or `410 quote_expired`:
 
-| Status | Code | Next step |
+- **The body has `quote`:** a free new quote for the same trade, not executed. Read its price,
+  `safety.verdict` and `readiness` as in section 4, tell the user the new price, and swap its
+  `quoteId` if they still want it. There is one per paid quote.
+- **`next` is `stop`:** a new quote for the trade came back untradeable: no route or not enough
+  liquidity, a `cannot_sell` or `illiquid` verdict, a route that can't be executed, or a taker that
+  can't finish it. `error.hint` says which. Tell the user the trade can't be done now, and why.
+- **No `quote`, `next` is `requote`:** quote again yourself. (That includes a server error while
+  arcgate re-quoted: it doesn't mean the trade is impossible.)
+
+## 6. Confirm the fill
+
+Once the user's wallet has sent the transactions, call `receipt` (free) with the `quoteId` and
+every transaction hash it sent:
+
+```bash
+node scripts/arcgate.mjs receipt '{"quoteId":"q_…","txHashes":["0x…","0x…"]}'
+```
+
+- **`pass`**: tell the user what they got: `delivered` of `token`, in base units (divide by
+  10^`buy.decimals` from the quote).
+- **`fail`**: follow `next`. `requote`: nothing filled (the swap reverted or was never mined);
+  quote again if the user still wants the trade. `stop`: a swap for this quote did fill (it
+  delivered less than `minAmountOut`, or it filled in a transaction you didn't list); tell the user
+  `reason` and don't trade again.
+- **`pending`**: a transaction isn't mined yet. Wait a few seconds and ask again.
+
+It answers for an hour after the `swap` call (`404 swap_not_found` after that), and only for that
+swap's own transactions.
+
+## 7. Errors: act on `next`
+
+Every error body has `next` beside `error`: do what `next` says; `code` says why. One exception:
+a `quote_stale` or `quote_expired` whose free new quote can't be traded says `stop`, not `requote`
+(section 5). Over MCP the tool result's `structuredContent` is the same body, except two results
+`@x402/mcp` writes itself, which have no `next`: the payment-required one, and a text-only
+`Internal Server Error` when the payment facilitator fails mid-call. A 200 carries `next` when it
+needs an action: `sign_permit` on a `swap` answer with a permit to sign, `stop` on a quote whose
+verdict is `cannot_sell` or `illiquid`, whose `best.executable` is `false`, or whose
+`readiness.ready` is `false`, and on a `receipt`, `retry` while `pending` and, after a `fail`,
+`requote` when nothing filled or `stop` when a swap did.
+
+| `next` | Codes | What you do |
 | --- | --- | --- |
-| 400 | `invalid_request`, `ticker_not_allowed` | Fix the request (addresses, not tickers) |
-| 402 | - | Payment needed; the script pays it |
-| 404 | `quote_not_found` | That `quoteId` was never issued here: quote again |
-| 409 | `quote_stale` | Price moved: quote again |
-| 410 | `quote_expired` | Older than 120s: quote again |
-| 422 | `insufficient_balance`, `insufficient_liquidity`, `not_executable` | Tell the user |
+| `requote` | `quote_not_found`, `quote_stale`, `quote_expired` | Swap the free new quote in `quote` if the body has one and the user accepts its price (section 5); otherwise quote again, then swap the new `quoteId` |
+| `retry` | `rpc_unavailable`, `lookup_rate_limited`, `receipt_rate_limited`, `payment_unavailable` | Send the same request again, after `retryAfterSec` seconds when the body has it |
+| `fix_request` | `invalid_request`, `ticker_not_allowed`, `invalid_amount`, `unsupported_pair`, `unknown_venue`, `unknown_source`, `taker_required`, `token_not_found`, `payload_too_large` | The request is wrong (a ticker instead of an address, the amount, a venue): fix it, then send it |
+| `stop` | `no_route`, `insufficient_liquidity`, `unsupported_venue`, `buy_reverts`, `insufficient_balance`, `swap_reverts`, `cannot_sell`, `not_executable`, `swap_not_found`, `receipt_reads_exhausted`, `internal`, `client_closed` | Don't retry; tell the user why (`error.message`) |
+| `pay` | `payment_required` | Pay the 402; the script does it |
+| `sign_permit` | - | Have the taker sign `signatures[0].typedData`, then call `swap` again with `permit` (section 5) |
 
 ## Worked examples
 
@@ -147,5 +204,10 @@ real quote schema. "spend 100 USDC on MOLLY", after search resolves MOLLY:
 2. Settle exactIn vs exactOut; ask if the amount's currency is ambiguous.
 3. Resolve every ticker with search; use addresses.
 4. Quote; read `safety.verdict` and `best.executable`; stop on `cannot_sell` or `illiquid`.
-5. Swap within 120s with `approval: "approve"` and a `taker` that holds the funds.
+5. Swap within 120s with a `taker` that holds the funds. With Permit2, send the signed permit in
+   a second, free `swap` call. On a `409`/`410`, offer the free new `quote` at its price; on
+   `next: stop`, stop.
 6. The user's wallet signs and sends the transactions, in order.
+7. Confirm with `receipt` (free): pass, tell the user what they got; fail, follow `next`
+   (`requote`: nothing filled; `stop`: a swap filled, so tell them `reason` and don't trade again);
+   pending, wait and ask again.

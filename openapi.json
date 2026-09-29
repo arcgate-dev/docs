@@ -3,7 +3,7 @@
   "info": {
     "title": "arcgate",
     "version": "0.1.0",
-    "description": "arcgate is a checkpoint between your agent and the DEXes on Arc. It finds the token you meant, the venues that can actually fill it, and whether the trade is safe, then prices it and hands back unsigned transactions. **It never holds funds and never signs.** Your wallet does both.\n\n# A checkpoint, not a DEX\n\nThree calls, in this order, then your wallet takes over.\n\n<ol>\n<li><code>search</code><strong>Right token.</strong><span>Every contract with the name you asked for, ranked, with impostors flagged by identity. Pick the address you meant.</span></li>\n<li><code>quote</code><strong>Right venue, safe to trade, best price.</strong><span>Only pools that exist and hold liquidity at this block. A simulated buy and sell-back from a fresh wallet. Prices at parity with KyberSwap. Returns a quoteId that is good for 120 seconds.</span></li>\n<li><code>swap</code><strong>Unsigned transactions.</strong><span>The quoteId and your taker address become the transactions to send, any approvals first, then the swap, re-simulated from your wallet first, and executed through arcgate's own ArcgateRouter contract. Approvals your allowance already covers are skipped, and a route funded entirely by native USDC needs no approval or signature at all. With the default Permit2 approval you may otherwise get a permit to sign, and then you call swap again with it.</span></li>\n<li><code>sign</code><strong>Your wallet signs.</strong><span>And broadcasts. arcgate never does.</span></li>\n</ol>\n\n# Pay per call with x402\n\n`search`, `quote` and `swap` are paid per call with [x402](https://x402.org) v2, in USDC on Arc. No API keys, no accounts.\n\n1. Call the endpoint with no payment. The answer is `402 Payment Required`, with the requirements (scheme, network, amount, asset, `payTo`, timeout) base64-encoded in the `PAYMENT-REQUIRED` header.\n2. Sign an EIP-3009 authorization for that amount and retry the **same** request with the signed payload, base64-encoded, in `PAYMENT-SIGNATURE`.\n3. A paid response carries the settlement receipt in `PAYMENT-RESPONSE`.\n\nAny x402 client runs that loop for you. Fees are paid in **real USDC on Arc mainnet**, the same chain the trade runs on. Arc USDC isn't one of x402's built-in assets, so the client must allow it explicitly, or every payment is refused before it's signed. The example follows the language picked under **Client Libraries**:\n\n```js\nimport { wrapFetchWithPayment } from \"@x402/fetch\";\nimport { x402Client } from \"@x402/core/client\";\nimport { ExactEvmScheme } from \"@x402/evm/exact/client\";\nimport { privateKeyToAccount } from \"viem/accounts\";\n\n// The server shown on this page.\nconst API = process.env.API_URL;\n// Holds USDC on Arc mainnet: fees are real.\nconst signer =\n  privateKeyToAccount(process.env.PRIVATE_KEY);\n// The address you picked from search.\nconst TOKEN = \"0x…\";\n\n// Fees are paid on Arc mainnet. (A local dev stack\n// charges on Arc testnet: \"eip155:5042002\".)\nconst FEE_NETWORK = \"eip155:5042\";\nconst USDC =\n  \"0x3600000000000000000000000000000000000000\";\n\nconst x402 = x402Client.fromConfig({\n  schemes: [{\n    network: FEE_NETWORK,\n    client: new ExactEvmScheme(signer),\n  }],\n  // Allow Arc USDC, capped per payment at the top\n  // swap fee (5 USDC).\n  spendControls: {\n    allowedAssets: [{\n      network: FEE_NETWORK,\n      asset: USDC,\n      maxAmountPerPayment: \"5000000\",\n    }],\n  },\n});\nconst pay = wrapFetchWithPayment(fetch, x402);\n\nasync function call(path, body) {\n  const res = await pay(`${API}/trade/v1/${path}`, {\n    method: \"POST\",\n    headers: { \"content-type\": \"application/json\" },\n    body: JSON.stringify(body),\n  });\n  const json = await res.json();\n  // Errors are never charged.\n  if (!res.ok) {\n    const code = json.error?.code;\n    throw new Error(`${path}: ${res.status} ${code}`);\n  }\n  return json;\n}\n\n// 0.01 USDC: route, round-trip loss, 120 second\n// expiry. Sells 100 USDC.\nconst quote = await call(\"quote\", {\n  sell: USDC, buy: TOKEN, amount: \"100\",\n});\n\n// 0.01 to 5 USDC by size. approval \"approve\" is\n// always one call: at most one exact-amount ERC-20\n// approve(ArcgateRouter, amountIn), no Permit2, no\n// signature. The default, \"permit2\", can return a\n// permit to sign and a second paid call.\nconst swap = await call(\"swap\", {\n  quoteId: quote.quoteId,\n  taker: signer.address,\n  approval: \"approve\",\n});\n\n// swap.transactions: approvals still needed, then\n// the swap, all unsigned. Read what you sign. Your\n// wallet signs and sends each one, in order.\n```\n\n```python\n# pip install \"x402[evm,requests]\"\nimport os\nfrom eth_account import Account\nfrom x402 import (\n    SchemeRegistration,\n    x402ClientConfig,\n    x402ClientSync,\n)\nfrom x402.http.clients import x402_requests\nfrom x402.mechanisms.evm.exact import (\n    ExactEvmClientScheme)\n\n# The server shown on this page.\nAPI = os.environ[\"API_URL\"]\n# Holds USDC on Arc mainnet: fees are real.\naccount = Account.from_key(os.environ[\"PRIVATE_KEY\"])\n# The address you picked from search.\nTOKEN = \"0x…\"\n\n# Fees are paid on Arc mainnet. (A local dev stack\n# charges on Arc testnet: \"eip155:5042002\".)\nFEE_NETWORK = \"eip155:5042\"\nUSDC = \"0x3600000000000000000000000000000000000000\"\n\nx402 = x402ClientSync.from_config(x402ClientConfig(\n    schemes=[SchemeRegistration(\n        network=FEE_NETWORK,\n        client=ExactEvmClientScheme(account),\n    )],\n    # Allow Arc USDC, capped per payment at the top\n    # swap fee (5 USDC).\n    spend_controls={\"allowed_assets\": [{\n        \"network\": FEE_NETWORK,\n        \"asset\": USDC,\n        \"max_amount_per_payment\": \"5000000\",\n    }]},\n))\nsession = x402_requests(x402)\n\ndef call(path, body):\n    url = f\"{API}/trade/v1/{path}\"\n    res = session.post(url, json=body)\n    data = res.json()\n    # Errors are never charged.\n    if not res.ok:\n        code = data[\"error\"][\"code\"]\n        raise RuntimeError(\n            f\"{path}: {res.status_code} {code}\")\n    return data\n\n# 0.01 USDC: route, round-trip loss, 120 second\n# expiry. Sells 100 USDC.\nquote = call(\"quote\", {\n    \"sell\": USDC, \"buy\": TOKEN, \"amount\": \"100\",\n})\n\n# 0.01 to 5 USDC by size. approval \"approve\" is\n# always one call: at most one exact-amount approve,\n# no Permit2, no signature.\nswap = call(\"swap\", {\n    \"quoteId\": quote[\"quoteId\"],\n    \"taker\": account.address,\n    \"approval\": \"approve\",\n})\n\n# swap[\"transactions\"]: approvals still needed, then\n# the swap, all unsigned. Read what you sign. Your\n# wallet signs and sends each one, in order.\n```\n\n```bash\n# Free calls work from curl as they are.\ncurl \"$API_URL/trade/v1/venues\"\ncurl \"$API_URL/health\"\n\n# A paid call answers 402, with its price in\n# PAYMENT-REQUIRED (base64 JSON).\nUSDC=0x3600000000000000000000000000000000000000\nTOKEN=0x…   # the address you picked from search\nBODY=\"{\\\"sell\\\":\\\"$USDC\\\",\\\"buy\\\":\\\"$TOKEN\\\",\"\nBODY+=\"\\\"amount\\\":\\\"100\\\"}\"\ncurl -s -D - -o /dev/null \\\n  -X POST \"$API_URL/trade/v1/quote\" \\\n  -H 'content-type: application/json' -d \"$BODY\" \\\n  | grep -i '^payment-required' | cut -d' ' -f2 \\\n  | tr -d '\\r' | base64 -d\n\n# curl can't sign the EIP-3009 payment for the\n# retry. Pay with the JavaScript or Python client\n# (pick it under Client Libraries), or connect over\n# MCP below.\n```\n\n# Prices\n\n| Operation | USDC per call |\n| --- | --- |\n| `search` | 0.005 |\n| `quote` | 0.01 |\n| `swap` under 1k | 0.01 |\n| `swap` 1k to 10k | 0.05 |\n| `swap` over 10k | 0.05 + 0.5 bps above 10k, capped at 5 |\n| `venues`, `health`, `openapi` | free |\n\nErrors are never charged. A `cannot_sell` safety verdict on a quote is an answer, so it is charged. `insufficient_liquidity` (`422`) and an expired quote (`410`) are free. Nothing is taken from your swap output. When the default Permit2 approval needs a second `swap` call, that call is priced on its own.\n\n# Calling the API\n\nEvery operation has a **Test Request** button that calls the API from this page. Free operations, `venues` and `health`, just run. A paid one answers `402`, and the page pays it with your browser wallet (MetaMask, or any EIP-1193 wallet): it switches the wallet to Arc mainnet, asks you to sign the USDC authorization for the price shown, and resends the call. An MCP tool call on `POST /trade/v1/mcp` is paid the same way: when the tool answers with its price, the page signs it and resends the call with the payment inside.\n\n> [!CAUTION]\n> **Test Requests on paid operations cost real money.** Each one is a real x402 payment in USDC on Arc mainnet, at the prices above, from the wallet you connect. Your wallet shows the exact amount before you sign, and nothing is paid unless you sign. A single payment is never allowed above 5 USDC, the top swap fee, and errors are never charged.\n\n`swap` takes a `quoteId`, so run `quote` first and paste its id into the swap body. The `swap` answer is unsigned transactions for Arc mainnet: this page shows them, it never sends them.\n\nFrom your own code, use an x402 client as above, or the MCP server below.\n\n# MCP for agents\n\n`POST /trade/v1/mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server over Streamable HTTP. It is stateless: there's no session to open or keep, and every call is a single JSON-RPC `POST` (send `Accept: application/json, text/event-stream`).\n\n| Tool | What it does | USDC per call |\n| --- | --- | --- |\n| `tradeSearch` | Resolves a ticker, name or address to tokens | 0.005 |\n| `tradeQuote` | Prices a swap and returns a `quoteId` | 0.01 |\n| `tradeSwap` | Turns a `quoteId` into unsigned transactions | 0.01 to 5, by size |\n| `tradeVenues` | Lists venues, hubs and launchpads | free |\n| `health` | Reports service status | free |\n\nEach tool takes the same input as its operation on this page and costs the same. Payments are real USDC on Arc mainnet.\n\n**Paying inside MCP.** MCP has no HTTP headers, so x402 rides in the tool call itself. A paid tool called without payment answers `isError: true` with the price in `structuredContent`: the same requirements a `402` carries. An x402-aware client signs them and calls again with the payment in `params._meta[\"x402/payment\"]`, and the result carries the settlement receipt in `_meta[\"x402/payment-response\"]`. A result with `isError: true` is never charged. `@x402/mcp` runs that loop for you:\n\n```js\nimport { createx402MCPClient } from \"@x402/mcp\";\nimport { ExactEvmScheme } from \"@x402/evm/exact/client\";\nimport { StreamableHTTPClientTransport } from\n  \"@modelcontextprotocol/sdk/client/streamableHttp.js\";\nimport { privateKeyToAccount } from \"viem/accounts\";\n\n// Holds USDC on Arc mainnet: fees are real.\nconst signer =\n  privateKeyToAccount(process.env.PRIVATE_KEY);\n// The address you picked from tradeSearch.\nconst TOKEN = \"0x…\";\n\nconst FEE_NETWORK = \"eip155:5042\";\nconst USDC =\n  \"0x3600000000000000000000000000000000000000\";\n\nconst client = createx402MCPClient({\n  name: \"my-agent\",\n  version: \"1.0.0\",\n  schemes: [{\n    network: FEE_NETWORK,\n    client: new ExactEvmScheme(signer),\n  }],\n  // Allow Arc USDC, capped per payment at the top\n  // swap fee (5 USDC).\n  spendControls: {\n    allowedAssets: [{\n      network: FEE_NETWORK,\n      asset: USDC,\n      maxAmountPerPayment: \"5000000\",\n    }],\n  },\n});\nconst url = new URL(\n  `${process.env.API_URL}/trade/v1/mcp`);\nawait client.connect(\n  new StreamableHTTPClientTransport(url));\n// A tool's answer is JSON in its text content.\nconst body = (result) =>\n  JSON.parse(result.content[0].text);\n\n// Paid tools pay on their own; free ones never do.\nconst quote = await client.callTool(\"tradeQuote\", {\n  sell: USDC, buy: TOKEN, amount: \"100\",\n});\nif (quote.isError) {\n  throw new Error(JSON.stringify(quote.content));\n}\n// quote.paymentResponse is the settlement receipt.\nconst { quoteId } = body(quote);\n\nconst swap = await client.callTool(\"tradeSwap\", {\n  quoteId, taker: signer.address, approval: \"approve\",\n});\n// body(swap).transactions: unsigned, in order. Read\n// what you sign, then sign and send.\n```\n\nA generic MCP host (Claude Desktop, Cursor and the like) can connect and call the free tools. Its paid calls come back with the price, because paying takes an x402-aware client like the one above.\n\n# Agent skill\n\n`arcgate-trade` is an [Agent Skill](https://agentskills.io) that teaches an agent to take a plain-English order (\"buy 100 USDC of X\", \"sell my MOLLY\") through search, quote and swap: settling the trade's direction, resolving tickers to addresses, reading the safety verdict, and handing the user's wallet the transactions to sign. It includes a script that makes the paid calls with a wallet key, capped per payment.\n\n**Claude Code:**\n\n```bash\n/plugin marketplace add arcgate-dev/docs\n/plugin install arcgate-trade@arcgate\n```\n\n**Any other agent:** load [`/plugin/skills/arcgate-trade/SKILL.md`](/plugin/skills/arcgate-trade/SKILL.md) from this site; the script is in the same folder.\n\nPaid calls need an agent that can run code and a wallet key in `PRIVATE_KEY`, holding USDC on Arc. The fees are real. An agent that can't run code can still plan the trade and make the free calls."
+    "description": "arcgate is a checkpoint between your agent and the DEXes on Arc. It finds the token you meant, the venues that can actually fill it, and whether the trade is safe, then prices it and hands back unsigned transactions. **It never holds funds and never signs.** Your wallet does both.\n\n# A checkpoint, not a DEX\n\nThree paid calls, in this order, then your wallet takes over, and a free receipt tells you whether it landed.\n\n<ol>\n<li><code>search</code><strong>Right token.</strong><span>Every contract with the name you asked for, ranked, with impostors flagged by identity. Pick the address you meant.</span></li>\n<li><code>quote</code><strong>Right venue, safe to trade, best price.</strong><span>Only pools that exist and hold liquidity at this block. A simulated buy and sell-back from a fresh wallet. Prices at parity with KyberSwap. Returns a quoteId that is good for 120 seconds. Name your <code>taker</code> and it also says whether that wallet can finish the trade, and what finishing costs (<code>readiness</code>).</span></li>\n<li><code>swap</code><strong>Unsigned transactions.</strong><span>The quoteId and your taker address become the transactions to send, any approvals first, then the swap, re-simulated from your wallet first, and executed through arcgate's own ArcgateRouter contract. Approvals your allowance already covers are skipped, and a route funded entirely by native USDC needs no approval or signature at all. With the default Permit2 approval you may otherwise get a permit to sign, and then you call swap again with it, free.</span></li>\n<li><code>sign</code><strong>Your wallet signs.</strong><span>And broadcasts. arcgate never does.</span></li>\n<li><code>receipt</code><strong>Did it land?</strong><span>Free. Send the quoteId and your transaction hashes; get back what you received against minAmountOut, and pass or fail.</span></li>\n</ol>\n\n# Paying arcgate from your own code\n\n`search`, `quote` and `swap` are paid per call with [x402](https://x402.org) v2, in USDC on Arc. No API keys, no accounts.\n\n1. Call the endpoint with no payment. The answer is `402 Payment Required`, with the requirements (scheme, network, amount, asset, `payTo`, timeout) base64-encoded in the `PAYMENT-REQUIRED` header.\n2. Sign an EIP-3009 authorization for that amount and retry the **same** request with the signed payload, base64-encoded, in `PAYMENT-SIGNATURE`.\n3. A paid response carries the settlement receipt in `PAYMENT-RESPONSE`.\n\nAny x402 client runs that loop for you. Fees are paid in **real USDC on Arc mainnet**, the same chain the trade runs on. Arc USDC isn't one of x402's built-in assets (the standard client libraries ship USDC for Base only), so the client must allow it explicitly, or every payment is refused before it's signed. In JavaScript, that's `spendControls.allowedAssets` with network `eip155:5042`, asset `0x3600000000000000000000000000000000000000` and a per-payment maximum, as in the example below. Install once:\n\n```bash\nnpm install @x402/fetch @x402/core @x402/evm viem\n# Python: pip install \"x402[evm,requests]\"\n```\n\nThe example follows the language picked under **Client Libraries**. Its first call is one paid `search` (0.005 USDC), which proves the setup; the calls after it are the whole trade:\n\n```js\nimport { wrapFetchWithPayment } from \"@x402/fetch\";\nimport { x402Client } from \"@x402/core/client\";\nimport { ExactEvmScheme } from \"@x402/evm/exact/client\";\nimport { privateKeyToAccount } from \"viem/accounts\";\n\n// The server shown on this page.\nconst API = process.env.API_URL;\n// Holds USDC on Arc mainnet: fees are real.\nconst signer =\n  privateKeyToAccount(process.env.PRIVATE_KEY);\n// The address you picked from search.\nconst TOKEN = \"0x…\";\n\n// Fees are paid on Arc mainnet. (A local dev stack\n// charges on Arc testnet: \"eip155:5042002\".)\nconst FEE_NETWORK = \"eip155:5042\";\nconst USDC =\n  \"0x3600000000000000000000000000000000000000\";\n\nconst x402 = x402Client.fromConfig({\n  schemes: [{\n    network: FEE_NETWORK,\n    client: new ExactEvmScheme(signer),\n  }],\n  // Allow Arc USDC, capped per payment at the top\n  // swap fee (5 USDC).\n  spendControls: {\n    allowedAssets: [{\n      network: FEE_NETWORK,\n      asset: USDC,\n      maxAmountPerPayment: \"5000000\",\n    }],\n  },\n});\nconst pay = wrapFetchWithPayment(fetch, x402);\n\nasync function call(path, body) {\n  const res = await pay(`${API}/trade/v1/${path}`, {\n    method: \"POST\",\n    headers: { \"content-type\": \"application/json\" },\n    body: JSON.stringify(body),\n  });\n  const json = await res.json();\n  // Errors are never charged.\n  if (!res.ok) {\n    const code = json.error?.code;\n    throw new Error(`${path}: ${res.status} ${code}`);\n  }\n  return json;\n}\n\n// 0.005 USDC: the first paid call. If this returns\n// results, Arc USDC is allowed and the wallet pays.\nconst found = await call(\"search\", { query: \"USDC\" });\n\n// 0.01 USDC: route, round-trip loss, 120 second\n// expiry. Sells 100 USDC.\nconst quote = await call(\"quote\", {\n  sell: USDC, buy: TOKEN, amount: \"100\",\n});\n\n// 0.01 to 5 USDC by size. approval \"approve\" is\n// always one call: at most one exact-amount ERC-20\n// approve(ArcgateRouter, amountIn), no Permit2, no\n// signature. The default, \"permit2\", can return a\n// permit to sign and a second call, which is free.\nconst swap = await call(\"swap\", {\n  quoteId: quote.quoteId,\n  taker: signer.address,\n  approval: \"approve\",\n});\n\n// swap.transactions: approvals still needed, then\n// the swap, all unsigned. Read what you sign. Your\n// wallet signs and sends each one, in order.\n```\n\n```python\n# pip install \"x402[evm,requests]\"\nimport os\nfrom eth_account import Account\nfrom x402 import (\n    SchemeRegistration,\n    x402ClientConfig,\n    x402ClientSync,\n)\nfrom x402.http.clients import x402_requests\nfrom x402.mechanisms.evm.exact import (\n    ExactEvmClientScheme)\n\n# The server shown on this page.\nAPI = os.environ[\"API_URL\"]\n# Holds USDC on Arc mainnet: fees are real.\naccount = Account.from_key(os.environ[\"PRIVATE_KEY\"])\n# The address you picked from search.\nTOKEN = \"0x…\"\n\n# Fees are paid on Arc mainnet. (A local dev stack\n# charges on Arc testnet: \"eip155:5042002\".)\nFEE_NETWORK = \"eip155:5042\"\nUSDC = \"0x3600000000000000000000000000000000000000\"\n\nx402 = x402ClientSync.from_config(x402ClientConfig(\n    schemes=[SchemeRegistration(\n        network=FEE_NETWORK,\n        client=ExactEvmClientScheme(account),\n    )],\n    # Allow Arc USDC, capped per payment at the top\n    # swap fee (5 USDC).\n    spend_controls={\"allowed_assets\": [{\n        \"network\": FEE_NETWORK,\n        \"asset\": USDC,\n        \"max_amount_per_payment\": \"5000000\",\n    }]},\n))\nsession = x402_requests(x402)\n\ndef call(path, body):\n    url = f\"{API}/trade/v1/{path}\"\n    res = session.post(url, json=body)\n    data = res.json()\n    # Errors are never charged.\n    if not res.ok:\n        code = data[\"error\"][\"code\"]\n        raise RuntimeError(\n            f\"{path}: {res.status_code} {code}\")\n    return data\n\n# 0.005 USDC: the first paid call. If this returns\n# results, Arc USDC is allowed and the wallet pays.\nfound = call(\"search\", {\"query\": \"USDC\"})\n\n# 0.01 USDC: route, round-trip loss, 120 second\n# expiry. Sells 100 USDC.\nquote = call(\"quote\", {\n    \"sell\": USDC, \"buy\": TOKEN, \"amount\": \"100\",\n})\n\n# 0.01 to 5 USDC by size. approval \"approve\" is\n# always one call: at most one exact-amount approve,\n# no Permit2, no signature.\nswap = call(\"swap\", {\n    \"quoteId\": quote[\"quoteId\"],\n    \"taker\": account.address,\n    \"approval\": \"approve\",\n})\n\n# swap[\"transactions\"]: approvals still needed, then\n# the swap, all unsigned. Read what you sign. Your\n# wallet signs and sends each one, in order.\n```\n\n```bash\n# Free calls work from curl as they are.\ncurl \"$API_URL/trade/v1/venues\"\ncurl \"$API_URL/health\"\n\n# A paid call answers 402, with its price in\n# PAYMENT-REQUIRED (base64 JSON).\nUSDC=0x3600000000000000000000000000000000000000\nTOKEN=0x…   # the address you picked from search\nBODY=\"{\\\"sell\\\":\\\"$USDC\\\",\\\"buy\\\":\\\"$TOKEN\\\",\"\nBODY+=\"\\\"amount\\\":\\\"100\\\"}\"\ncurl -s -D - -o /dev/null \\\n  -X POST \"$API_URL/trade/v1/quote\" \\\n  -H 'content-type: application/json' -d \"$BODY\" \\\n  | grep -i '^payment-required' | cut -d' ' -f2 \\\n  | tr -d '\\r' | base64 -d\n\n# curl can't sign the EIP-3009 payment for the\n# retry. Pay with the JavaScript or Python client\n# (pick it under Client Libraries), or connect over\n# MCP below.\n```\n\n# Prices\n\n| Operation | USDC per call |\n| --- | --- |\n| `search` | 0.005 |\n| `quote` | 0.01 |\n| `swap` under 1k | 0.01 |\n| `swap` 1k to 10k | 0.05 |\n| `swap` over 10k | 0.05 + 0.5 bps above 10k, capped at 5 |\n| `venues`, `health`, `openapi` | free |\n\nErrors are never charged. A `cannot_sell` safety verdict on a quote is an answer, so it is charged. `insufficient_liquidity` (`422`) and an expired quote (`410`) are free. Nothing is taken from your swap output. `swap` is charged once per quote: when the default Permit2 approval needs a second `swap` call with the signed permit, that call is free.\n\n# Calling the API\n\nEvery operation has a **Test Request** button that calls the API from this page. Free operations, `venues` and `health`, just run. A paid one answers `402`, and the page pays it with your browser wallet (MetaMask, or any EIP-1193 wallet): it switches the wallet to Arc mainnet, asks you to sign the USDC authorization for the price shown, and resends the call. An MCP tool call on `POST /trade/v1/mcp` is paid the same way: when the tool answers with its price, the page signs it and resends the call with the payment inside.\n\n> [!CAUTION]\n> **Test Requests on paid operations cost real money.** Each one is a real x402 payment in USDC on Arc mainnet, at the prices above, from the wallet you connect. Your wallet shows the exact amount before you sign, and nothing is paid unless you sign. A single payment is never allowed above 5 USDC, the top swap fee, and errors are never charged.\n\n`swap` takes a `quoteId`, so run `quote` first and paste its id into the swap body. The `swap` answer is unsigned transactions for Arc mainnet: this page shows them, it never sends them.\n\nFrom your own code, use an x402 client as above, or the MCP server below.\n\nEvery error body has `next` beside `error`, saying what to do: `requote`, `retry` (after `retryAfterSec` when given), `fix_request`, `stop` or `pay`; a 200 that needs an action has one too.\n\nEvery response carries an `X-Request-Id` header. If a call goes wrong in a way you don't expect, send us that id with your report: it finds that exact call in our logs, including what the payment facilitator said about your payment.\n\n# MCP for agents\n\n`POST /trade/v1/mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server over Streamable HTTP. It is stateless: there's no session to open or keep, and every call is a single JSON-RPC `POST` (send `Accept: application/json, text/event-stream`).\n\n| Tool | What it does | USDC per call |\n| --- | --- | --- |\n| `tradeSearch` | Resolves a ticker, name or address to tokens | 0.005 |\n| `tradeQuote` | Prices a swap and returns a `quoteId` | 0.01 |\n| `tradeSwap` | Turns a `quoteId` into unsigned transactions | 0.01 to 5, by size |\n| `tradeVenues` | Lists venues, hubs and launchpads | free |\n| `health` | Reports service status | free |\n\nEach tool takes the same input as its operation on this page and costs the same. Payments are real USDC on Arc mainnet.\n\n**Paying inside MCP.** MCP has no HTTP headers, so x402 rides in the tool call itself. A paid tool called without payment answers `isError: true` with the price in `structuredContent`: the same requirements a `402` carries. An x402-aware client signs them and calls again with the payment in `params._meta[\"x402/payment\"]`, and the result carries the settlement receipt in `_meta[\"x402/payment-response\"]`. A result with `isError: true` is never charged. `@x402/mcp` runs that loop for you:\n\n```js\nimport { createx402MCPClient } from \"@x402/mcp\";\nimport { ExactEvmScheme } from \"@x402/evm/exact/client\";\nimport { StreamableHTTPClientTransport } from\n  \"@modelcontextprotocol/sdk/client/streamableHttp.js\";\nimport { privateKeyToAccount } from \"viem/accounts\";\n\n// Holds USDC on Arc mainnet: fees are real.\nconst signer =\n  privateKeyToAccount(process.env.PRIVATE_KEY);\n// The address you picked from tradeSearch.\nconst TOKEN = \"0x…\";\n\nconst FEE_NETWORK = \"eip155:5042\";\nconst USDC =\n  \"0x3600000000000000000000000000000000000000\";\n\nconst client = createx402MCPClient({\n  name: \"my-agent\",\n  version: \"1.0.0\",\n  schemes: [{\n    network: FEE_NETWORK,\n    client: new ExactEvmScheme(signer),\n  }],\n  // Allow Arc USDC, capped per payment at the top\n  // swap fee (5 USDC).\n  spendControls: {\n    allowedAssets: [{\n      network: FEE_NETWORK,\n      asset: USDC,\n      maxAmountPerPayment: \"5000000\",\n    }],\n  },\n});\nconst url = new URL(\n  `${process.env.API_URL}/trade/v1/mcp`);\nawait client.connect(\n  new StreamableHTTPClientTransport(url));\n// A tool's answer is JSON in its text content.\nconst body = (result) =>\n  JSON.parse(result.content[0].text);\n\n// Paid tools pay on their own; free ones never do.\nconst quote = await client.callTool(\"tradeQuote\", {\n  sell: USDC, buy: TOKEN, amount: \"100\",\n});\nif (quote.isError) {\n  throw new Error(JSON.stringify(quote.content));\n}\n// quote.paymentResponse is the settlement receipt.\nconst { quoteId } = body(quote);\n\nconst swap = await client.callTool(\"tradeSwap\", {\n  quoteId, taker: signer.address, approval: \"approve\",\n});\n// body(swap).transactions: unsigned, in order. Read\n// what you sign, then sign and send.\n```\n\nA generic MCP host (Claude Desktop, Cursor and the like) can connect and call the free tools. Its paid calls come back with the price, because paying takes an x402-aware client like the one above.\n\n# Agent skill\n\n`arcgate-trade` is an [Agent Skill](https://agentskills.io) that teaches an agent to take a plain-English order (\"buy 100 USDC of X\", \"sell my MOLLY\") through search, quote and swap: settling the trade's direction, resolving tickers to addresses, reading the safety verdict, and handing the user's wallet the transactions to sign. It includes a script that makes the paid calls with a wallet key, capped per payment.\n\n**Claude Code:**\n\n```bash\n/plugin marketplace add arcgate-dev/docs\n/plugin install arcgate-trade@arcgate\n```\n\n**Any other agent:** load [`/plugin/skills/arcgate-trade/SKILL.md`](/plugin/skills/arcgate-trade/SKILL.md) from this site; the script is in the same folder.\n\nPaid calls need an agent that can run code and a wallet key in `PRIVATE_KEY`, holding USDC on Arc. The fees are real. An agent that can't run code can still plan the trade and make the free calls."
   },
   "servers": [
     {
@@ -15,7 +15,7 @@
     {
       "name": "trade",
       "x-displayName": "Trade",
-      "description": "Find a token, price a swap, and build the transactions: search -> quote -> swap, plus venues and the MCP endpoint."
+      "description": "Find a token, price a swap, build the transactions and confirm the fill: search -> quote -> swap -> receipt, plus venues and the MCP endpoint."
     },
     {
       "name": "service",
@@ -107,10 +107,10 @@
                             "creatorLinked": false,
                             "depth2PctUsd": "64000",
                             "depthKind": "lower_bound",
-                            "depthAgeSec": 237506,
+                            "depthAgeSec": 490936,
                             "volume24hUsd": "934.1393915596246",
                             "traders24h": 23,
-                            "ageHours": 3305.611388888889,
+                            "ageHours": 3376.008611111111,
                             "posterior": null
                           },
                           "discovered": "index",
@@ -205,13 +205,13 @@
                           "evidence": {
                             "firstWithTicker": false,
                             "creatorLinked": false,
-                            "depth2PctUsd": "2133.013026",
+                            "depth2PctUsd": "1451.256332",
                             "depthKind": "measured",
-                            "depthAgeSec": 104911,
+                            "depthAgeSec": 78620,
                             "volume24hUsd": "531987.846046",
                             "traders24h": 817,
-                            "ageHours": 251.2263888888889,
-                            "posterior": 0.33067574541296646
+                            "ageHours": 321.62361111111113,
+                            "posterior": 0.342990632858822
                           },
                           "discovered": "index",
                           "origin": {
@@ -280,7 +280,7 @@
                             }
                           ],
                           "liquidityUsd": "389157.3722",
-                          "depth2PctUsd": "2133.013026",
+                          "depth2PctUsd": "1451.256332",
                           "volume24hUsd": "531987.846046",
                           "holders": null,
                           "safety": {
@@ -294,10 +294,10 @@
                             "canSell": true,
                             "buyTaxBps": 100,
                             "sellTaxBps": 100,
-                            "buyImpactBps": 1,
+                            "buyImpactBps": 0,
                             "roundTripLossBps": 394,
                             "scope": {
-                              "block": 22887982,
+                              "block": 23393283,
                               "walletProfile": "fresh_eoa"
                             }
                           },
@@ -312,7 +312,7 @@
                               "verdict": "taxed",
                               "buyTaxBps": 100,
                               "sellTaxBps": 100,
-                              "checkedBlock": 22887982
+                              "checkedBlock": 23393283
                             },
                             {
                               "routeId": "uniswap_v3:0x083859cf0533b25f35a958a9292fa5653528f841",
@@ -324,7 +324,19 @@
                               "verdict": "ok",
                               "buyTaxBps": 0,
                               "sellTaxBps": 0,
-                              "checkedBlock": 22564701
+                              "checkedBlock": 23391278
+                            },
+                            {
+                              "routeId": "uniswap_v4:0x2f4040d563fc000f9d0ee449f21c6d551e471ecdce0e618a14507af43b18101f",
+                              "route": {
+                                "venue": "uniswap_v4",
+                                "poolId": "0x2f4040d563fc000f9d0ee449f21c6d551e471ecdce0e618a14507af43b18101f",
+                                "pair": "USDC"
+                              },
+                              "verdict": "ok",
+                              "buyTaxBps": 0,
+                              "sellTaxBps": 0,
+                              "checkedBlock": 23080319
                             }
                           ],
                           "flags": [
@@ -342,6 +354,9 @@
               }
             },
             "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
               "PAYMENT-RESPONSE": {
                 "description": "Settlement receipt for this call's payment (base64 JSON); see the SettleResponse schema for the decoded shape.",
                 "schema": {
@@ -352,7 +367,7 @@
                     "$ref": "#/components/schemas/SettleResponse"
                   }
                 },
-                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4NUVkZmY4MkYwRTdEQzI1OTY4Y2JhOEI2MTRiZURENzgyYWMyY0VERCIsInRyYW5zYWN0aW9uIjoiMHg1ODNkMWJkMzZlN2I2MWUyMmEyN2JhOWFlNTY0NGMxZDViMjRiMTVlMTViNjcyMjQ2MWFjNjRkMDA3OTQ3Y2M1IiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
+                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4NUVkZmY4MkYwRTdEQzI1OTY4Y2JhOEI2MTRiZURENzgyYWMyY0VERCIsInRyYW5zYWN0aW9uIjoiMHgzYzM3ZTRhZjMxMDA2YmIyOTQ3ZDU3MzlmNmE4NzkzOGIzOTBiOGFiZTBlOTAyZTc3YWRhMTUzNWIwYjVlNGQ4IiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
               }
             }
           },
@@ -380,10 +395,16 @@
                             "message": "Invalid input: expected string, received undefined"
                           }
                         ]
-                      }
+                      },
+                      "next": "fix_request"
                     }
                   }
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
               }
             }
           },
@@ -398,6 +419,11 @@
                   "$ref": "#/components/schemas/ErrorBody"
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
             }
           },
           "413": {
@@ -408,6 +434,11 @@
                   "$ref": "#/components/schemas/ErrorBody"
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
             }
           },
           "429": {
@@ -417,6 +448,11 @@
                 "schema": {
                   "$ref": "#/components/schemas/ErrorBody"
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
               }
             }
           },
@@ -435,6 +471,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
             }
           },
           "502": {
@@ -448,6 +489,11 @@
                   "$ref": "#/components/schemas/ErrorBody"
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
             }
           }
         }
@@ -460,7 +506,7 @@
           "trade"
         ],
         "summary": "Quote a swap between two different assets",
-        "description": "Prices a swap between `sell` and `buy` across the indexed venues and stores it under a `quoteId`.\n\n- **Cost:** 0.01 USDC per call over x402: the first call gets a 402 with payment requirements in the `PAYMENT-REQUIRED` header (base64 JSON); sign them and retry with a `PAYMENT-SIGNATURE` header carrying the payment payload.\n- **`sell` / `buy`:** two different assets (native and ERC-20 USDC count as the same asset; either side may be USDC). Resolve a ticker with POST /trade/v1/search first.\n- **Response shape:** when one side is USDC, `best.type` is `direct`/`two_hop`/`split` and `best.legs` lists one leg per path actually used; `routes[]` lists every discovery candidate. When neither side is USDC, or when a USDC-side allocation can't be expressed as legs, `best.type` is `graph`, `best.legs` is empty, and the execution plan is in `best.graph`. Both shapes support `side: exactIn` and `exactOut`, and both execute the same way through POST /trade/v1/swap.\n- **`amount`:** a human-readable decimal string in the token's own units, e.g. \"1.5\" for 1.5 USDC, not base units. It is the `sell` amount for `side: exactIn` and the `buy` amount for `side: exactOut`.\n- **Optional:** `side` (exactIn/exactOut), `slippageBps`, split and hop limits, `venues`/`excludeVenues` (ids from GET /trade/v1/venues), `taker`, `ttlSec`.\n- **Executability:** POST /trade/v1/swap executes every quote through ArcgateRouter. `best.executable` is `false`, with warning `graph_execution_unavailable`, when no ArcgateRouter is configured (or, for an Aerodrome edge, no Aerodrome router), or when the operator has disabled a selected path's venue - even with both routers configured. In that last case, POST /trade/v1/swap may still fall back to an executable candidate the quote already priced instead of failing outright.\n- **Lifetime:** the `quoteId` is good for `ttlSec` seconds (default and max 120).\n- **Next:** POST /trade/v1/swap with the returned `quoteId`.",
+        "description": "Prices a swap between `sell` and `buy` across the indexed venues and stores it under a `quoteId`.\n\n- **Cost:** 0.01 USDC per call over x402: the first call gets a 402 with payment requirements in the `PAYMENT-REQUIRED` header (base64 JSON); sign them and retry with a `PAYMENT-SIGNATURE` header carrying the payment payload.\n- **`sell` / `buy`:** two different assets (native and ERC-20 USDC count as the same asset; either side may be USDC). Resolve a ticker with POST /trade/v1/search first.\n- **Response shape:** when one side is USDC, `best.type` is `direct`/`two_hop`/`split` and `best.legs` lists one leg per path actually used; `routes[]` lists every discovery candidate. When neither side is USDC, or when a USDC-side allocation can't be expressed as legs, `best.type` is `graph`, `best.legs` is empty, and the execution plan is in `best.graph`. Both shapes support `side: exactIn` and `exactOut`, and both execute the same way through POST /trade/v1/swap.\n- **`amount`:** a human-readable decimal string in the token's own units, e.g. \"1.5\" for 1.5 USDC, not base units. It is the `sell` amount for `side: exactIn` and the `buy` amount for `side: exactOut`.\n- **Optional:** `side` (exactIn/exactOut), `slippageBps`, split and hop limits, `venues`/`excludeVenues` (ids from GET /trade/v1/venues), `taker`, `ttlSec`.\n- **Executability:** POST /trade/v1/swap executes every quote through ArcgateRouter. `best.executable` is `false`, with warning `graph_execution_unavailable`, when no ArcgateRouter is configured (or, for an Aerodrome edge, no Aerodrome router), or when the operator has disabled a selected path's venue - even with both routers configured. In that last case, POST /trade/v1/swap may still fall back to an executable candidate the quote already priced instead of failing outright.\n- **Readiness:** name the wallet that will trade in `taker` and the answer carries `readiness`, read at the quote's block: whether that wallet holds the input (`balance`), which approval or Permit2 signature POST /trade/v1/swap will need (`approval` for the default permit2, `approve` for `approval: \"approve\"`), enough native USDC for gas (`gas`), and whether this call's x402 payer can pay the swap fee (`fees`). `totalCostUsdc` is the swap fee plus gas: what finishing costs. When `ready` is false, `next` is `stop`. Without `taker` there is no `readiness`.\n- **Lifetime:** the `quoteId` is good for `ttlSec` seconds (default and max 120).\n- **Next:** POST /trade/v1/swap with the returned `quoteId`.",
         "security": [
           {
             "x402": []
@@ -511,10 +557,10 @@
                   "quoted route": {
                     "summary": "quoted route",
                     "value": {
-                      "quoteId": "q_2158286f481b04b3",
+                      "quoteId": "q_d02d694103c1e1f2",
                       "network": "eip155:5042",
-                      "block": 22887982,
-                      "expiresAt": "2026-09-26T17:38:49.499Z",
+                      "block": 23393292,
+                      "expiresAt": "2026-09-29T16:02:36.289Z",
                       "side": "exactIn",
                       "sell": {
                         "address": "0x3600000000000000000000000000000000000000",
@@ -558,10 +604,10 @@
                               "feeBps": null
                             }
                           ],
-                          "amountOutQuoted": "0.037131379479438172",
+                          "amountOutQuoted": "0.037364994127906937",
                           "buyTaxBps": 0,
                           "costVsMidBps": 0,
-                          "gasUsdc": "0.008508",
+                          "gasUsdc": "0.00857",
                           "fee": {
                             "bps": 0,
                             "amount": "0",
@@ -588,10 +634,10 @@
                               "hooks": "0x1df2971b2dfb0e80d7061dbe5e73688ba6552800"
                             }
                           ],
-                          "amountOutQuoted": "0.037010546873944789",
+                          "amountOutQuoted": "0.037282329350358011",
                           "buyTaxBps": 0,
-                          "costVsMidBps": 32,
-                          "gasUsdc": "0.00361",
+                          "costVsMidBps": 22,
+                          "gasUsdc": "0.003606",
                           "fee": {
                             "bps": 0,
                             "amount": "0",
@@ -617,10 +663,10 @@
                               "feeBps": 30
                             }
                           ],
-                          "amountOutQuoted": "0.036994003459495142",
+                          "amountOutQuoted": "0.037028477878735493",
                           "buyTaxBps": 0,
-                          "costVsMidBps": 36,
-                          "gasUsdc": "0.0052",
+                          "costVsMidBps": 90,
+                          "gasUsdc": "0.005201",
                           "fee": {
                             "bps": 0,
                             "amount": "0",
@@ -916,10 +962,10 @@
                               "feeBps": null
                             }
                           ],
-                          "amountOutQuoted": "0.037113009268576821",
+                          "amountOutQuoted": "0.037358031360826521",
                           "buyTaxBps": 0,
-                          "costVsMidBps": 4,
-                          "gasUsdc": "0.011552",
+                          "costVsMidBps": 1,
+                          "gasUsdc": "0.011457",
                           "fee": {
                             "bps": 0,
                             "amount": "0",
@@ -1029,10 +1075,10 @@
                               "feeBps": null
                             }
                           ],
-                          "amountOutQuoted": "0.037113009268576821",
+                          "amountOutQuoted": "0.037343738764921397",
                           "buyTaxBps": 0,
-                          "costVsMidBps": 4,
-                          "gasUsdc": "0.016057",
+                          "costVsMidBps": 5,
+                          "gasUsdc": "0.016086",
                           "fee": {
                             "bps": 0,
                             "amount": "0",
@@ -1143,10 +1189,10 @@
                               "feeBps": null
                             }
                           ],
-                          "amountOutQuoted": "0.037042087607461681",
+                          "amountOutQuoted": "0.037244622717046637",
                           "buyTaxBps": 0,
-                          "costVsMidBps": 24,
-                          "gasUsdc": "0.010541",
+                          "costVsMidBps": 32,
+                          "gasUsdc": "0.010478",
                           "fee": {
                             "bps": 0,
                             "amount": "0",
@@ -1697,11 +1743,11 @@
                       "unsupportedVenues": [],
                       "best": {
                         "provider": "native",
-                        "amountOutQuoted": "0.037131379479438172",
-                        "amountOutSimulated": "0.037131379479438172",
-                        "amountOutRaw": "37131379479438172",
-                        "minAmountOut": "0.03676006568464379",
-                        "gasUsdc": "0.008508",
+                        "amountOutQuoted": "0.037364994127906937",
+                        "amountOutSimulated": "0.037364994127906937",
+                        "amountOutRaw": "37364994127906937",
+                        "minAmountOut": "0.036991344186627867",
+                        "gasUsdc": "0.00857",
                         "fee": {
                           "bps": 0,
                           "amount": "0",
@@ -1717,8 +1763,8 @@
                             "routeIndex": 0,
                             "shareBps": 10000,
                             "amountIn": "100",
-                            "amountOut": "0.037131379479438172",
-                            "minAmountOut": "0.03676006568464379"
+                            "amountOut": "0.037364994127906937",
+                            "minAmountOut": "0.036991344186627867"
                           }
                         ]
                       },
@@ -1739,10 +1785,10 @@
                         "sellDelaySec": null,
                         "revertReason": null,
                         "scope": {
-                          "block": 22887982,
+                          "block": 23393292,
                           "walletProfile": "fresh_eoa",
                           "sellDelaySec": null,
-                          "tokenAgeSec": 8811858
+                          "tokenAgeSec": 9065285
                         },
                         "note": "Both endpoints are pinned assets; graph delivery was measured at the quote block."
                       },
@@ -1754,6 +1800,9 @@
               }
             },
             "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
               "PAYMENT-RESPONSE": {
                 "description": "Settlement receipt for this call's payment (base64 JSON); see the SettleResponse schema for the decoded shape.",
                 "schema": {
@@ -1764,7 +1813,7 @@
                     "$ref": "#/components/schemas/SettleResponse"
                   }
                 },
-                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4NUVkZmY4MkYwRTdEQzI1OTY4Y2JhOEI2MTRiZURENzgyYWMyY0VERCIsInRyYW5zYWN0aW9uIjoiMHg0MTU3Njg0YzFlYzY5NTZiYzQyODE5OGE0ZTg0OGNlNGI4YWRkOTllMTU4MzUwMTllZmI5OTZjZDlhZDBjNDMzIiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
+                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4NUVkZmY4MkYwRTdEQzI1OTY4Y2JhOEI2MTRiZURENzgyYWMyY0VERCIsInRyYW5zYWN0aW9uIjoiMHhiZTdiYjEzMWRjODhiNjI1NjZiOGZkY2ZkNWY1N2ViNzQ1Njk3ZDU3N2NmNmQ5Y2JmZTgxZWVmNTI5ODFlNzFiIiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
               }
             }
           },
@@ -1783,10 +1832,16 @@
                         "code": "ticker_not_allowed",
                         "message": "sell must be a 0x token address, not a ticker or name",
                         "hint": "Resolve the ticker with POST /trade/v1/search and quote the address you pick."
-                      }
+                      },
+                      "next": "fix_request"
                     }
                   }
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
               }
             }
           },
@@ -1801,6 +1856,11 @@
                   "$ref": "#/components/schemas/QuoteErrorResponse"
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
             }
           },
           "413": {
@@ -1810,6 +1870,11 @@
                 "schema": {
                   "$ref": "#/components/schemas/ErrorBody"
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
               }
             }
           },
@@ -1821,6 +1886,11 @@
                   "$ref": "#/components/schemas/QuoteErrorResponse"
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
             }
           },
           "429": {
@@ -1830,6 +1900,11 @@
                 "schema": {
                   "$ref": "#/components/schemas/QuoteErrorResponse"
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
               }
             }
           },
@@ -1848,6 +1923,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
             }
           },
           "502": {
@@ -1861,6 +1941,11 @@
                   "$ref": "#/components/schemas/QuoteErrorResponse"
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
             }
           }
         }
@@ -1873,7 +1958,7 @@
           "trade"
         ],
         "summary": "Turn a stored quote into unsigned swap transactions",
-        "description": "Turns a stored quote into unsigned transactions for the taker to sign and send. arcgate never signs, broadcasts or holds funds.\n\n- **Cost:** 0.01 USDC under $1,000; 0.05 USDC from $1,000 to $10,000; above that 0.05 USDC plus 0.5 bps of the amount over $10,000, capped at 5 USDC, size-tiered by the quote's USD notional (the USDC side for a USDC pair, or a token-to-token quote's USD valuation; a quote with no valuation prices at tier 1), over x402 (402 with `PAYMENT-REQUIRED`, retry with `PAYMENT-SIGNATURE`). Every call is priced on its own, so a round-2 call pays again.\n- **Key inputs:** `quoteId` (from POST /trade/v1/quote), `taker`; optional `recipient` (defaults to `taker`), `deadlineSec`, `approval`, `permit`.\n- **Every quote executes through ArcgateRouter:** it is always the Permit2 `spender` and the ERC-20 `approve` spender below. When every source pool of the route being executed trades native USDC, the swap is funded by `value` instead - no approval transaction and no signature at all.\n- **Permit2 (default, one or two calls):**\n  - **Round 1** (no `permit`): returns `transactions` - an unlimited ERC-20 `approve(Permit2, type(uint256).max)` first, if the token's ERC-20 allowance to Permit2 is below the amount, then the swap, which carries an empty Permit2 signature and is only directly sendable as-is when a Permit2 allowance to ArcgateRouter already covers the amount, in which case `signatures` is empty too. Otherwise it also returns `signatures: [{ kind: \"permit2\", typedData }]`; sign `typedData` with the taker's key (EIP-712, e.g. viem's `signTypedData`).\n  - **Round 2** (call again with the same `quoteId` and `permit: { message: typedData.message, signature }`): `permit` accepts only `message` and `signature`, end to end - any other field, at any level, is 400 `invalid_request` at parse. The service rebuilds the Permit2 domain itself and checks the signer, spender, token, amount, nonce and both deadlines: a mismatched spender or token, or an amount below `amountIn` (a larger amount is accepted), is 400 `invalid_request`; a stale nonce, an expired `sigDeadline`/`expiration`, or an invalid signature (verified via ERC-1271 on chain for a contract taker) is 422 `swap_reverts`.\n  - A valid permit is embedded in the swap, and the on-chain deadline is clamped to `min(now + deadlineSec, sigDeadline, expiration)`.\n  - Send that response's `transactions` in order.\n- **`approval: \"approve\"` (one call):** returns at most one ERC-20 `approve(ArcgateRouter, amountIn)` transaction instead of a permit to sign - an exact amount, never Permit2, never a signature - and only when the taker's current allowance is below it. Combining `permit` with `approval: \"approve\"` is 400 `invalid_request`.\n- **Freshness:** the quote lives for the `ttlSec` the quote call asked for (default/max 120s); after that `quoteId` is 410 `quote_expired`. Every call re-quotes and re-simulates at the current block and returns 409 `quote_stale` when the fresh re-quote fails or falls below the stored `minAmountOut`, when the pre-flight simulation reverts on slippage, or when the simulated delivery is below `minAmountOut`.\n- **Fallback:** A stored route on a disabled/undeployed venue falls back to the best executable candidate the quote already priced (warning `route_not_executable`), or 422 `not_executable` when no such candidate exists, none re-quotes, or no ArcgateRouter is configured at all.\n- **Next:** sign and send `transactions` in order. This is the last call in search -> quote -> swap.",
+        "description": "Turns a stored quote into unsigned transactions for the taker to sign and send. arcgate never signs, broadcasts or holds funds.\n\n- **Cost:** 0.01 USDC under $1,000; 0.05 USDC from $1,000 to $10,000; above that 0.05 USDC plus 0.5 bps of the amount over $10,000, capped at 5 USDC, size-tiered by the quote's USD notional (the USDC side for a USDC pair, or a token-to-token quote's USD valuation; a quote with no valuation prices at tier 1), over x402 (402 with `PAYMENT-REQUIRED`, retry with `PAYMENT-SIGNATURE`). Charged once per quote: the Permit2 round 2 below is free.\n- **Key inputs:** `quoteId` (from POST /trade/v1/quote), `taker`; optional `recipient` (defaults to `taker`), `deadlineSec`, `approval`, `permit`.\n- **Every quote executes through ArcgateRouter:** it is always the Permit2 `spender` and the ERC-20 `approve` spender below. When every source pool of the route being executed trades native USDC, the swap is funded by `value` instead - no approval transaction and no signature at all.\n- **Permit2 (default, one or two calls):**\n  - **Round 1** (no `permit`): returns `transactions` - an unlimited ERC-20 `approve(Permit2, type(uint256).max)` first, if the token's ERC-20 allowance to Permit2 is below the amount, then the swap, which carries an empty Permit2 signature and is only directly sendable as-is when a Permit2 allowance to ArcgateRouter already covers the amount, in which case `signatures` is empty too. Otherwise it also returns `signatures: [{ kind: \"permit2\", typedData }]`; sign `typedData` with the taker's key (EIP-712, e.g. viem's `signTypedData`).\n  - **Round 2** (call again with the same `quoteId`, `taker` and `recipient`, and `permit: { message: typedData.message, signature }`, while the quote is live): free, because round 1 paid the swap fee. The first round 2 that succeeds uses it up; a failed one doesn't. `permit` accepts only `message` and `signature`, end to end - any other field, at any level, is 400 `invalid_request` at parse. The service rebuilds the Permit2 domain itself and checks the signer, spender, token, amount, nonce and both deadlines: a mismatched spender or token, or an amount below `amountIn` (a larger amount is accepted), is 400 `invalid_request`; a stale nonce, an expired `sigDeadline`/`expiration`, or an invalid signature (verified via ERC-1271 on chain for a contract taker) is 422 `swap_reverts`.\n  - A valid permit is embedded in the swap, and the on-chain deadline is clamped to `min(now + deadlineSec, sigDeadline, expiration)`.\n  - Send that response's `transactions` in order.\n- **`approval: \"approve\"` (one call):** returns at most one ERC-20 `approve(ArcgateRouter, amountIn)` transaction instead of a permit to sign - an exact amount, never Permit2, never a signature - and only when the taker's current allowance is below it. Combining `permit` with `approval: \"approve\"` is 400 `invalid_request`.\n- **Freshness:** the quote lives for the `ttlSec` the quote call asked for (default/max 120s); after that `quoteId` is 410 `quote_expired`. Every call re-quotes and re-simulates at the current block and returns 409 `quote_stale` when the fresh re-quote fails or falls below the stored `minAmountOut`, when the pre-flight simulation reverts on slippage, or when the simulated delivery is below `minAmountOut`. A 409 or 410 carries a free fresh quote in `quote`, with `next: \"requote\"`: the original quote request (same amount, tokens, side, `slippageBps` and venues, default `ttlSec`) quoted again through the same pipeline, exactly as POST /trade/v1/quote answers it; when the original named a `taker`, the fresh quote is for this call's `taker`, the wallet swapping now. Nothing executes on it: check its price, `safety.verdict` and `readiness`, then swap its `quoteId`. When the fresh quote can't be traded (`no_route`, `insufficient_liquidity`, `unsupported_venue` or `buy_reverts`, a `cannot_sell` or `illiquid` verdict, not executable, or the taker isn't ready) the answer is `next: \"stop\"` with no `quote`, and `error.hint` says why. One fresh quote per paid quote: a second 409/410 for the same `quoteId`, a quote that itself came from a 409/410, or a quote expired over 5 minutes ago gets plain `requote` with no `quote`, as does one whose re-quote couldn't run or failed on the server's side; then quote again yourself.\n- **Fallback:** A stored route on a disabled/undeployed venue falls back to the best executable candidate the quote already priced (warning `route_not_executable`), or 422 `not_executable` when no such candidate exists, none re-quotes, or no ArcgateRouter is configured at all.\n- **Next:** sign and send `transactions` in order, then confirm the fill with POST /trade/v1/receipt (free). This is the last paid call in search -> quote -> swap.",
         "security": [
           {
             "x402": []
@@ -1922,8 +2007,8 @@
                 "first round, no permit": {
                   "summary": "first round, no permit",
                   "value": {
-                    "quoteId": "q_2158286f481b04b3",
-                    "taker": "0x7fAdbf0612F64885857fFeBf27B3D14FA9e40efD"
+                    "quoteId": "q_d02d694103c1e1f2",
+                    "taker": "0x93595C7Ac4E7E5afe5232D614041B48a6111687B"
                   }
                 }
               }
@@ -1942,9 +2027,9 @@
                   "first round": {
                     "summary": "first round",
                     "value": {
-                      "quoteId": "q_2158286f481b04b3",
-                      "block": 22887982,
-                      "expiresAt": "2026-09-26T17:37:58.000Z",
+                      "quoteId": "q_d02d694103c1e1f2",
+                      "block": 23393292,
+                      "expiresAt": "2026-09-29T16:01:42.000Z",
                       "signatures": [
                         {
                           "kind": "permit2",
@@ -1993,11 +2078,11 @@
                               "details": {
                                 "token": "0x3600000000000000000000000000000000000000",
                                 "amount": "100000000",
-                                "expiration": "1793036218",
+                                "expiration": "1793289642",
                                 "nonce": "0"
                               },
-                              "spender": "0x0ea7461542fe051c013ab0f5860190bc847f3271",
-                              "sigDeadline": "1790444278"
+                              "spender": "0x6cf4f7785d479b9ec1c3abe2fb569525380baede",
+                              "sigDeadline": "1790697702"
                             }
                           }
                         }
@@ -2011,31 +2096,35 @@
                           "purpose": "approve"
                         },
                         {
-                          "to": "0x0ea7461542fe051c013ab0f5860190bc847f3271",
-                          "data": "0xfdbcb69200000000000000000000000036000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5e100000000000000000000000000128cc466b61f542da60c70e3aa11c10e19b84edb00000000000000000000000000000000000000000000000000829915c10d9fce0000000000000000000000007fadbf0612f64885857ffebf27b3d14fa9e40efd000000000000000000000000000000000000000000000000000000006ab802f6000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000003c00000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000128cc466b61f542da60c70e3aa11c10e19b84edb0000000000000000000000000000000000000000000000000000000005f5e1000000000000000000000000000000000000000000000000000000000005f5e10000000000000000000000000000000000000000000000000000829915c10d9fce0000000000000000000000003e5e0a3eae5c9cb5c4cad22c9fa9d23c58caac330000000000000000000000003600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a400000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000104a026383e0000000000000000000000003600000000000000000000000000000000000000000000000000000000000000128cc466b61f542da60c70e3aa11c10e19b84edb00000000000000000000000000000000000000000000000000000000000000320000000000000000000000000ea7461542fe051c013ab0f5860190bc847f3271000000000000000000000000000000000000000000000000000000006ab802f67fffffffffffffffffffffffffffffffffffffffffffffffffffffffa3a3a3a400000000000000000000000000000000000000000000000000829915c10d9fce000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000",
+                          "to": "0x6cf4f7785d479b9ec1c3abe2fb569525380baede",
+                          "data": "0xfdbcb69200000000000000000000000036000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5e100000000000000000000000000128cc466b61f542da60c70e3aa11c10e19b84edb00000000000000000000000000000000000000000000000000836b6e7a02171b00000000000000000000000093595c7ac4e7e5afe5232d614041b48a6111687b000000000000000000000000000000000000000000000000000000006abbe0e6000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000003c00000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000128cc466b61f542da60c70e3aa11c10e19b84edb0000000000000000000000000000000000000000000000000000000005f5e1000000000000000000000000000000000000000000000000000000000005f5e10000000000000000000000000000000000000000000000000000836b6e7a02171b00000000000000000000000057025fb592d9832b05d11097058c475b3ed974210000000000000000000000003600000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a400000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000104a026383e0000000000000000000000003600000000000000000000000000000000000000000000000000000000000000128cc466b61f542da60c70e3aa11c10e19b84edb00000000000000000000000000000000000000000000000000000000000000320000000000000000000000006cf4f7785d479b9ec1c3abe2fb569525380baede000000000000000000000000000000000000000000000000000000006abbe0e67fffffffffffffffffffffffffffffffffffffffffffffffffffffffa3a3a3a400000000000000000000000000000000000000000000000000836b6e7a02171b000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000",
                           "value": "0",
-                          "gas": "695689",
+                          "gas": "674049",
                           "purpose": "swap"
                         }
                       ],
-                      "amountOutSimulated": "37131379479438172",
-                      "minAmountOut": "36760065684643790",
-                      "recipient": "0x7fadbf0612f64885857ffebf27b3d14fa9e40efd",
+                      "amountOutSimulated": "37364994127906937",
+                      "minAmountOut": "36991344186627867",
+                      "recipient": "0x93595c7ac4e7e5afe5232d614041b48a6111687b",
                       "safety": {
                         "verdict": "pinned",
                         "scope": {
                           "walletProfile": "taker",
-                          "block": 22887982
+                          "block": 23393292
                         }
                       },
                       "attestation": null,
-                      "warnings": []
+                      "warnings": [],
+                      "next": "sign_permit"
                     }
                   }
                 }
               }
             },
             "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              },
               "PAYMENT-RESPONSE": {
                 "description": "Settlement receipt for this call's payment (base64 JSON); see the SettleResponse schema for the decoded shape.",
                 "schema": {
@@ -2046,7 +2135,7 @@
                     "$ref": "#/components/schemas/SettleResponse"
                   }
                 },
-                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4NUVkZmY4MkYwRTdEQzI1OTY4Y2JhOEI2MTRiZURENzgyYWMyY0VERCIsInRyYW5zYWN0aW9uIjoiMHgzNzNlNzJkZTM0YmZiNWJmZDI5OGEwY2E0OWJlODhjNmM5ZjRkZjQzN2QzNzZlNWEyMWM2OTNiNGE3ZTI0NjNjIiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
+                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4NUVkZmY4MkYwRTdEQzI1OTY4Y2JhOEI2MTRiZURENzgyYWMyY0VERCIsInRyYW5zYWN0aW9uIjoiMHg5N2MxYzE0YWY1YzQxZmFjNjNhZjZiZGE4Y2FjNDQxZTFjY2NhNDU0NDJhZmQxYTk4ODczYjk5MDBiZWM1MDAxIiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
               }
             }
           },
@@ -2057,6 +2146,11 @@
                 "schema": {
                   "$ref": "#/components/schemas/SwapErrorResponse"
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
               }
             }
           },
@@ -2077,10 +2171,16 @@
                       "error": {
                         "code": "quote_not_found",
                         "message": "no quote with that id"
-                      }
+                      },
+                      "next": "requote"
                     }
                   }
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
               }
             }
           },
@@ -2092,6 +2192,11 @@
                   "$ref": "#/components/schemas/SwapErrorResponse"
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
             }
           },
           "410": {
@@ -2100,7 +2205,1292 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SwapErrorResponse"
+                },
+                "examples": {
+                  "quote_expired, with a fresh quote": {
+                    "summary": "quote_expired, with a fresh quote",
+                    "value": {
+                      "error": {
+                        "code": "quote_expired",
+                        "message": "the quote has expired"
+                      },
+                      "quote": {
+                        "quoteId": "q_d985acda48c048ea",
+                        "network": "eip155:5042",
+                        "block": 23393292,
+                        "expiresAt": "2026-09-29T16:03:03.093Z",
+                        "side": "exactIn",
+                        "sell": {
+                          "address": "0x3600000000000000000000000000000000000000",
+                          "symbol": "USDC",
+                          "decimals": 6,
+                          "amount": "100",
+                          "amountRaw": "100000000",
+                          "verification": {
+                            "status": "verified",
+                            "source": "circle_docs",
+                            "trust": 1
+                          },
+                          "state": null
+                        },
+                        "buy": {
+                          "address": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                          "symbol": "WETH",
+                          "decimals": 18,
+                          "verification": {
+                            "status": "verified",
+                            "source": "circle_docs",
+                            "trust": 1
+                          },
+                          "state": "pool_only",
+                          "discovered": "index"
+                        },
+                        "slippageBps": 100,
+                        "routes": [
+                          {
+                            "type": "direct",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|aerodrome_cl:0x6f302decb49fb30b2d2c609bdd16e04e7dd096fc",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "aerodrome_cl",
+                                "poolId": "0x6f302decb49fb30b2d2c609bdd16e04e7dd096fc",
+                                "tokenIn": "USDC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": null
+                              }
+                            ],
+                            "amountOutQuoted": "0.037364994127906937",
+                            "buyTaxBps": 0,
+                            "costVsMidBps": 0,
+                            "gasUsdc": "0.00857",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "direct",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v4:0xe68ba1ac44fe2b602ae95c05df0d3b8940e81ad16d859e63449b6fb5c64f2f8f",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0xe68ba1ac44fe2b602ae95c05df0d3b8940e81ad16d859e63449b6fb5c64f2f8f",
+                                "tokenIn": "USDC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 29,
+                                "hooks": "0x1df2971b2dfb0e80d7061dbe5e73688ba6552800"
+                              }
+                            ],
+                            "amountOutQuoted": "0.037282329350358011",
+                            "buyTaxBps": 0,
+                            "costVsMidBps": 22,
+                            "gasUsdc": "0.003606",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "direct",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v3:0x964cff2cccb9059e83d507df348f070e5257a2e0",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v3",
+                                "poolId": "0x964cff2cccb9059e83d507df348f070e5257a2e0",
+                                "tokenIn": "USDC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 30
+                              }
+                            ],
+                            "amountOutQuoted": "0.037028477878735493",
+                            "buyTaxBps": 0,
+                            "costVsMidBps": 90,
+                            "gasUsdc": "0.005201",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "direct",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v4:0x0e3778957c57c367e7ea5513122d3e300a1ee635166e22d07c284b01dcea1f95",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0x0e3778957c57c367e7ea5513122d3e300a1ee635166e22d07c284b01dcea1f95",
+                                "tokenIn": "USDC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 25,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "direct",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v4:0x3bbec4961c22b01bf59fae55aa26bb27a09af34464c08703d732455d1cca0458",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0x3bbec4961c22b01bf59fae55aa26bb27a09af34464c08703d732455d1cca0458",
+                                "tokenIn": "USDC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 20,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "direct",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v4:0x43d6152184604afd6b042b10581732773f38a3b78a853f162fbe22d78473da24",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0x43d6152184604afd6b042b10581732773f38a3b78a853f162fbe22d78473da24",
+                                "tokenIn": "USDC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 15,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "direct",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v4:0xc28a1c158752bfff216957aa4a763fc6039640eb56d4a1c317d3fbbe842a84c0",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0xc28a1c158752bfff216957aa4a763fc6039640eb56d4a1c317d3fbbe842a84c0",
+                                "tokenIn": "USDC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 1,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "direct",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v4:0xf77dcc99ff598ee0c39366c31788e879346e490614c311d337d43a4a54be3751",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0xf77dcc99ff598ee0c39366c31788e879346e490614c311d337d43a4a54be3751",
+                                "tokenIn": "USDC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 21,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "direct",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v4:0xfb8548b4ff27561d87480be6a9eaa54ed70e4acbf0573bcc3474e791b9fc4df7",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0xfb8548b4ff27561d87480be6a9eaa54ed70e4acbf0573bcc3474e791b9fc4df7",
+                                "tokenIn": "USDC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 29,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "direct",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v4:0xf9a7d535a7d2c0b6aa57c7a58fea5e9236f0fc3298dc0f29d45d28b6a5c13738",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0xf9a7d535a7d2c0b6aa57c7a58fea5e9236f0fc3298dc0f29d45d28b6a5c13738",
+                                "tokenIn": "USDC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 10,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "direct",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v4:0xb975733743abcffdc62507fe36eac83ad0d3600cb6ed4731cf62d32ad12a4425",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0xb975733743abcffdc62507fe36eac83ad0d3600cb6ed4731cf62d32ad12a4425",
+                                "tokenIn": "USDC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 23,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "direct",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v4:0xc0254fec12d761c1297865ad969f681c0328ae687889aebe67a53be6bd16900b",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0xc0254fec12d761c1297865ad969f681c0328ae687889aebe67a53be6bd16900b",
+                                "tokenIn": "USDC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 5,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "two_hop",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v3:0x82916bee18fcef517b26c72d7cb5f13694e1db41>aerodrome_cl:0x72dff32c9c5c28758565be0a7d4e6e42fb498506",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v3",
+                                "poolId": "0x82916bee18fcef517b26c72d7cb5f13694e1db41",
+                                "tokenIn": "USDC",
+                                "tokenOut": "cirBTC",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+                                "feeBps": 1
+                              },
+                              {
+                                "venue": "aerodrome_cl",
+                                "poolId": "0x72dff32c9c5c28758565be0a7d4e6e42fb498506",
+                                "tokenIn": "cirBTC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": null
+                              }
+                            ],
+                            "amountOutQuoted": "0.037358031360826521",
+                            "buyTaxBps": 0,
+                            "costVsMidBps": 1,
+                            "gasUsdc": "0.011457",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "two_hop",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v3:0x82916bee18fcef517b26c72d7cb5f13694e1db41>uniswap_v4:0xbcb805f39d6cd6dfa1f6d71f31d5705a8313d17a161d1bf0d672ac55fdd4cac9",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v3",
+                                "poolId": "0x82916bee18fcef517b26c72d7cb5f13694e1db41",
+                                "tokenIn": "USDC",
+                                "tokenOut": "cirBTC",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+                                "feeBps": 1
+                              },
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0xbcb805f39d6cd6dfa1f6d71f31d5705a8313d17a161d1bf0d672ac55fdd4cac9",
+                                "tokenIn": "cirBTC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 100,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "two_hop",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v3:0x82916bee18fcef517b26c72d7cb5f13694e1db41>uniswap_v3:0xbb505c923d0ce6364b6d1769fd85bd62b0c0e9c9",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v3",
+                                "poolId": "0x82916bee18fcef517b26c72d7cb5f13694e1db41",
+                                "tokenIn": "USDC",
+                                "tokenOut": "cirBTC",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+                                "feeBps": 1
+                              },
+                              {
+                                "venue": "uniswap_v3",
+                                "poolId": "0xbb505c923d0ce6364b6d1769fd85bd62b0c0e9c9",
+                                "tokenIn": "cirBTC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 30
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "two_hop",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|aerodrome_cl:0xd945caee4635bcd7fb8a9fa74dc1d0c4c1472782>aerodrome_cl:0x72dff32c9c5c28758565be0a7d4e6e42fb498506",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "aerodrome_cl",
+                                "poolId": "0xd945caee4635bcd7fb8a9fa74dc1d0c4c1472782",
+                                "tokenIn": "USDC",
+                                "tokenOut": "cirBTC",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+                                "feeBps": null
+                              },
+                              {
+                                "venue": "aerodrome_cl",
+                                "poolId": "0x72dff32c9c5c28758565be0a7d4e6e42fb498506",
+                                "tokenIn": "cirBTC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": null
+                              }
+                            ],
+                            "amountOutQuoted": "0.037343738764921397",
+                            "buyTaxBps": 0,
+                            "costVsMidBps": 5,
+                            "gasUsdc": "0.016086",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "two_hop",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|aerodrome_cl:0xd945caee4635bcd7fb8a9fa74dc1d0c4c1472782>uniswap_v4:0xbcb805f39d6cd6dfa1f6d71f31d5705a8313d17a161d1bf0d672ac55fdd4cac9",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "aerodrome_cl",
+                                "poolId": "0xd945caee4635bcd7fb8a9fa74dc1d0c4c1472782",
+                                "tokenIn": "USDC",
+                                "tokenOut": "cirBTC",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+                                "feeBps": null
+                              },
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0xbcb805f39d6cd6dfa1f6d71f31d5705a8313d17a161d1bf0d672ac55fdd4cac9",
+                                "tokenIn": "cirBTC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 100,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "two_hop",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|aerodrome_cl:0xd945caee4635bcd7fb8a9fa74dc1d0c4c1472782>uniswap_v3:0xbb505c923d0ce6364b6d1769fd85bd62b0c0e9c9",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "aerodrome_cl",
+                                "poolId": "0xd945caee4635bcd7fb8a9fa74dc1d0c4c1472782",
+                                "tokenIn": "USDC",
+                                "tokenOut": "cirBTC",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+                                "feeBps": null
+                              },
+                              {
+                                "venue": "uniswap_v3",
+                                "poolId": "0xbb505c923d0ce6364b6d1769fd85bd62b0c0e9c9",
+                                "tokenIn": "cirBTC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 30
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "two_hop",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v4:0x85ff2b5048d26bbdf37e249333b59891605149a4a5476cea5c93050501e0f83d>aerodrome_cl:0x72dff32c9c5c28758565be0a7d4e6e42fb498506",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0x85ff2b5048d26bbdf37e249333b59891605149a4a5476cea5c93050501e0f83d",
+                                "tokenIn": "USDC",
+                                "tokenOut": "cirBTC",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+                                "feeBps": 15,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              },
+                              {
+                                "venue": "aerodrome_cl",
+                                "poolId": "0x72dff32c9c5c28758565be0a7d4e6e42fb498506",
+                                "tokenIn": "cirBTC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": null
+                              }
+                            ],
+                            "amountOutQuoted": "0.037244622717046637",
+                            "buyTaxBps": 0,
+                            "costVsMidBps": 32,
+                            "gasUsdc": "0.010478",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "two_hop",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v4:0x85ff2b5048d26bbdf37e249333b59891605149a4a5476cea5c93050501e0f83d>uniswap_v4:0xbcb805f39d6cd6dfa1f6d71f31d5705a8313d17a161d1bf0d672ac55fdd4cac9",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0x85ff2b5048d26bbdf37e249333b59891605149a4a5476cea5c93050501e0f83d",
+                                "tokenIn": "USDC",
+                                "tokenOut": "cirBTC",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+                                "feeBps": 15,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              },
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0xbcb805f39d6cd6dfa1f6d71f31d5705a8313d17a161d1bf0d672ac55fdd4cac9",
+                                "tokenIn": "cirBTC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 100,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "two_hop",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v4:0x85ff2b5048d26bbdf37e249333b59891605149a4a5476cea5c93050501e0f83d>uniswap_v3:0xbb505c923d0ce6364b6d1769fd85bd62b0c0e9c9",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0x85ff2b5048d26bbdf37e249333b59891605149a4a5476cea5c93050501e0f83d",
+                                "tokenIn": "USDC",
+                                "tokenOut": "cirBTC",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+                                "feeBps": 15,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              },
+                              {
+                                "venue": "uniswap_v3",
+                                "poolId": "0xbb505c923d0ce6364b6d1769fd85bd62b0c0e9c9",
+                                "tokenIn": "cirBTC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 30
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "two_hop",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v3:0x5e82892d361a6c680027a97da2280064b8fc8a52>uniswap_v4:0x7b07f308dc43dd7d6fdfbfbc6456e61b88749816a998125cc1af86ac013946e0",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v3",
+                                "poolId": "0x5e82892d361a6c680027a97da2280064b8fc8a52",
+                                "tokenIn": "USDC",
+                                "tokenOut": "XAUM",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x178b01f61cbea1d2a5581fe1621be607835ec349",
+                                "feeBps": 5
+                              },
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0x7b07f308dc43dd7d6fdfbfbc6456e61b88749816a998125cc1af86ac013946e0",
+                                "tokenIn": "XAUM",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x178b01f61cbea1d2a5581fe1621be607835ec349",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 9885,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "two_hop",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v4:0x596b558298f7398edfc6579a32354f34544b403944dd5c4b05377a5993629eb2>uniswap_v4:0x7b07f308dc43dd7d6fdfbfbc6456e61b88749816a998125cc1af86ac013946e0",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0x596b558298f7398edfc6579a32354f34544b403944dd5c4b05377a5993629eb2",
+                                "tokenIn": "USDC",
+                                "tokenOut": "XAUM",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x178b01f61cbea1d2a5581fe1621be607835ec349",
+                                "feeBps": 5,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              },
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0x7b07f308dc43dd7d6fdfbfbc6456e61b88749816a998125cc1af86ac013946e0",
+                                "tokenIn": "XAUM",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x178b01f61cbea1d2a5581fe1621be607835ec349",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 9885,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "two_hop",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v4:0xc96ec046f0c094414e175ee751c1319dc2f22e685be5935e3406adbde85e6dda>uniswap_v4:0x7b07f308dc43dd7d6fdfbfbc6456e61b88749816a998125cc1af86ac013946e0",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0xc96ec046f0c094414e175ee751c1319dc2f22e685be5935e3406adbde85e6dda",
+                                "tokenIn": "USDC",
+                                "tokenOut": "XAUM",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x178b01f61cbea1d2a5581fe1621be607835ec349",
+                                "feeBps": 90,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              },
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0x7b07f308dc43dd7d6fdfbfbc6456e61b88749816a998125cc1af86ac013946e0",
+                                "tokenIn": "XAUM",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x178b01f61cbea1d2a5581fe1621be607835ec349",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 9885,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "two_hop",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v4:0x27b37d8ba66027716bc4bccdce7b797e4ecd9d2dc7e59df3eb5c8cf473b4081b>uniswap_v4:0x8fbdaf4c75ae7042e00e9685a4fae0f34f1a2c49a94106ed06ce3a25b4634869",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0x27b37d8ba66027716bc4bccdce7b797e4ecd9d2dc7e59df3eb5c8cf473b4081b",
+                                "tokenIn": "USDC",
+                                "tokenOut": "CRCL",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x2ba0f44bdfc17fba30eda9cdbecb908ca45b043b",
+                                "feeBps": 17,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              },
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0x8fbdaf4c75ae7042e00e9685a4fae0f34f1a2c49a94106ed06ce3a25b4634869",
+                                "tokenIn": "CRCL",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x2ba0f44bdfc17fba30eda9cdbecb908ca45b043b",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 9885,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "two_hop",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v3:0x64d77c65a5cbd728d891140fd5c30e07d21ee65b>uniswap_v4:0x8fbdaf4c75ae7042e00e9685a4fae0f34f1a2c49a94106ed06ce3a25b4634869",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v3",
+                                "poolId": "0x64d77c65a5cbd728d891140fd5c30e07d21ee65b",
+                                "tokenIn": "USDC",
+                                "tokenOut": "CRCL",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x2ba0f44bdfc17fba30eda9cdbecb908ca45b043b",
+                                "feeBps": 30
+                              },
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0x8fbdaf4c75ae7042e00e9685a4fae0f34f1a2c49a94106ed06ce3a25b4634869",
+                                "tokenIn": "CRCL",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x2ba0f44bdfc17fba30eda9cdbecb908ca45b043b",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 9885,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "two_hop",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v3:0x2e8180fa3967caf9abf57bbaeab9ae9063bcd7ba>uniswap_v4:0x8fbdaf4c75ae7042e00e9685a4fae0f34f1a2c49a94106ed06ce3a25b4634869",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v3",
+                                "poolId": "0x2e8180fa3967caf9abf57bbaeab9ae9063bcd7ba",
+                                "tokenIn": "USDC",
+                                "tokenOut": "CRCL",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0x2ba0f44bdfc17fba30eda9cdbecb908ca45b043b",
+                                "feeBps": 100
+                              },
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0x8fbdaf4c75ae7042e00e9685a4fae0f34f1a2c49a94106ed06ce3a25b4634869",
+                                "tokenIn": "CRCL",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0x2ba0f44bdfc17fba30eda9cdbecb908ca45b043b",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 9885,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "two_hop",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v3:0x6fd5f2fb831940dcd61a98c5b3acb7d8c6f3bfc1>uniswap_v4:0x77593a92cfedc9a37f1d4f358b0c402fcc25c73149e013477a3abeb00d7b47f1",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v3",
+                                "poolId": "0x6fd5f2fb831940dcd61a98c5b3acb7d8c6f3bfc1",
+                                "tokenIn": "USDC",
+                                "tokenOut": "EURC",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1",
+                                "feeBps": 5
+                              },
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0x77593a92cfedc9a37f1d4f358b0c402fcc25c73149e013477a3abeb00d7b47f1",
+                                "tokenIn": "EURC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 10000,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "two_hop",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v3:0x6fd5f2fb831940dcd61a98c5b3acb7d8c6f3bfc1>uniswap_v4:0xdc626cf9b88b9dc26fd0435ff9b27e48ad3d87a2640f4ee3ca0a58141d294326",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v3",
+                                "poolId": "0x6fd5f2fb831940dcd61a98c5b3acb7d8c6f3bfc1",
+                                "tokenIn": "USDC",
+                                "tokenOut": "EURC",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1",
+                                "feeBps": 5
+                              },
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0xdc626cf9b88b9dc26fd0435ff9b27e48ad3d87a2640f4ee3ca0a58141d294326",
+                                "tokenIn": "EURC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 9785,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "two_hop",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|aerodrome_cl:0xbe080ac37ad1305dfcc9521f5e6f68cfdc41b7fa>uniswap_v4:0x77593a92cfedc9a37f1d4f358b0c402fcc25c73149e013477a3abeb00d7b47f1",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "aerodrome_cl",
+                                "poolId": "0xbe080ac37ad1305dfcc9521f5e6f68cfdc41b7fa",
+                                "tokenIn": "USDC",
+                                "tokenOut": "EURC",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1",
+                                "feeBps": null
+                              },
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0x77593a92cfedc9a37f1d4f358b0c402fcc25c73149e013477a3abeb00d7b47f1",
+                                "tokenIn": "EURC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 10000,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "two_hop",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|aerodrome_cl:0xbe080ac37ad1305dfcc9521f5e6f68cfdc41b7fa>uniswap_v4:0xdc626cf9b88b9dc26fd0435ff9b27e48ad3d87a2640f4ee3ca0a58141d294326",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "aerodrome_cl",
+                                "poolId": "0xbe080ac37ad1305dfcc9521f5e6f68cfdc41b7fa",
+                                "tokenIn": "USDC",
+                                "tokenOut": "EURC",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1",
+                                "feeBps": null
+                              },
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0xdc626cf9b88b9dc26fd0435ff9b27e48ad3d87a2640f4ee3ca0a58141d294326",
+                                "tokenIn": "EURC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 9785,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "two_hop",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v2:0xfb778eacdd10603c521e8a343f4d37f3afa41fb7>uniswap_v4:0x77593a92cfedc9a37f1d4f358b0c402fcc25c73149e013477a3abeb00d7b47f1",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v2",
+                                "poolId": "0xfb778eacdd10603c521e8a343f4d37f3afa41fb7",
+                                "tokenIn": "USDC",
+                                "tokenOut": "EURC",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1",
+                                "feeBps": 0
+                              },
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0x77593a92cfedc9a37f1d4f358b0c402fcc25c73149e013477a3abeb00d7b47f1",
+                                "tokenIn": "EURC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 10000,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          },
+                          {
+                            "type": "two_hop",
+                            "routeId": "0x3600000000000000000000000000000000000000>0x128cc466b61f542da60c70e3aa11c10e19b84edb|uniswap_v2:0xfb778eacdd10603c521e8a343f4d37f3afa41fb7>uniswap_v4:0xdc626cf9b88b9dc26fd0435ff9b27e48ad3d87a2640f4ee3ca0a58141d294326",
+                            "provider": "native",
+                            "hops": [
+                              {
+                                "venue": "uniswap_v2",
+                                "poolId": "0xfb778eacdd10603c521e8a343f4d37f3afa41fb7",
+                                "tokenIn": "USDC",
+                                "tokenOut": "EURC",
+                                "tokenInAddress": "0x3600000000000000000000000000000000000000",
+                                "tokenOutAddress": "0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1",
+                                "feeBps": 0
+                              },
+                              {
+                                "venue": "uniswap_v4",
+                                "poolId": "0xdc626cf9b88b9dc26fd0435ff9b27e48ad3d87a2640f4ee3ca0a58141d294326",
+                                "tokenIn": "EURC",
+                                "tokenOut": "WETH",
+                                "tokenInAddress": "0xbef5f6d51cb62b58e6a8f77868681825c6fe21c1",
+                                "tokenOutAddress": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                                "feeBps": 9785,
+                                "hooks": "0x0000000000000000000000000000000000000000"
+                              }
+                            ],
+                            "buyTaxBps": 0,
+                            "costVsMidBps": null,
+                            "gasUsdc": "0",
+                            "fee": {
+                              "bps": 0,
+                              "amount": "0",
+                              "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                              "collector": null
+                            },
+                            "executable": true,
+                            "providerQuoteAgeBlocks": 0,
+                            "partialFill": false
+                          }
+                        ],
+                        "unsupportedVenues": [],
+                        "best": {
+                          "provider": "native",
+                          "amountOutQuoted": "0.037364994127906937",
+                          "amountOutSimulated": "0.037364994127906937",
+                          "amountOutRaw": "37364994127906937",
+                          "minAmountOut": "0.036991344186627867",
+                          "gasUsdc": "0.00857",
+                          "fee": {
+                            "bps": 0,
+                            "amount": "0",
+                            "token": "0x128cc466b61f542da60c70e3aa11c10e19b84edb",
+                            "collector": null
+                          },
+                          "executable": true,
+                          "providerQuoteAgeBlocks": 0,
+                          "floorBasis": "simulated",
+                          "type": "direct",
+                          "legs": [
+                            {
+                              "routeIndex": 0,
+                              "shareBps": 10000,
+                              "amountIn": "100",
+                              "amountOut": "0.037364994127906937",
+                              "minAmountOut": "0.036991344186627867"
+                            }
+                          ]
+                        },
+                        "safety": {
+                          "verdict": "pinned",
+                          "method": "simulate_v1",
+                          "routeId": "graph:0x3600000000000000000000000000000000000000:0x128cc466b61f542da60c70e3aa11c10e19b84edb:8b294cebb19db855561ff028",
+                          "canSell": true,
+                          "buyTaxBps": null,
+                          "sellTaxBps": null,
+                          "exitSellTaxBps": null,
+                          "buyImpactBps": 0,
+                          "sellImpactBps": null,
+                          "execCostBps": null,
+                          "roundTripLossBps": null,
+                          "maxBuyUsdc": null,
+                          "maxSellTokens": null,
+                          "sellDelaySec": null,
+                          "revertReason": null,
+                          "scope": {
+                            "block": 23393292,
+                            "walletProfile": "fresh_eoa",
+                            "sellDelaySec": null,
+                            "tokenAgeSec": 9065314
+                          },
+                          "note": "Both endpoints are pinned assets; graph delivery was measured at the quote block."
+                        },
+                        "warnings": [],
+                        "attestation": null,
+                        "readiness": {
+                          "taker": "0x93595c7ac4e7e5afe5232d614041b48a6111687b",
+                          "balance": {
+                            "token": "0x3600000000000000000000000000000000000000",
+                            "required": "100000000",
+                            "available": "1000000000",
+                            "enough": true
+                          },
+                          "approval": {
+                            "mode": "permit2",
+                            "needs": "approve_and_sign_permit"
+                          },
+                          "approve": {
+                            "needs": "approve"
+                          },
+                          "gas": {
+                            "estimatedUsdc": "0.01089",
+                            "available": "900",
+                            "enough": true
+                          },
+                          "fees": {
+                            "swapUsdc": "0.01",
+                            "payer": "0x5edff82f0e7dc25968cba8b614bedd782ac2cedd",
+                            "payerAvailable": null,
+                            "enough": null
+                          },
+                          "totalCostUsdc": "0.02089",
+                          "ready": true
+                        }
+                      },
+                      "next": "requote"
+                    }
+                  }
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
               }
             }
           },
@@ -2112,6 +3502,11 @@
                   "$ref": "#/components/schemas/ErrorBody"
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
             }
           },
           "422": {
@@ -2121,6 +3516,11 @@
                 "schema": {
                   "$ref": "#/components/schemas/SwapErrorResponse"
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
               }
             }
           },
@@ -2139,6 +3539,11 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
             }
           },
           "502": {
@@ -2151,6 +3556,151 @@
                 "schema": {
                   "$ref": "#/components/schemas/SwapErrorResponse"
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/trade/v1/receipt": {
+      "post": {
+        "operationId": "tradeReceipt",
+        "tags": [
+          "trade"
+        ],
+        "summary": "Confirm a swap landed: delivered against minAmountOut, pass or fail",
+        "description": "Tells you whether the transactions POST /trade/v1/swap returned did what the quote promised, once you've sent them. It only reads the chain.\n\n- **Cost:** free, never x402-gated.\n- **Key inputs:** `quoteId` (the one you called POST /trade/v1/swap with) and `txHashes`, the 1 to 4 transactions you sent for it: the swap, and any approvals. It answers for a quote /trade/v1/swap handed transactions for in the last hour, else 404 `swap_not_found`, and only for that quote's transactions, sent from its `taker`: an approval to the input token, or a swap to ArcgateRouter whose deadline one of the quote's /trade/v1/swap answers issued and whose output goes to its `recipient`, else 400 `invalid_request`.\n- **Returns:** `result`, from the swap transactions. One that filled decides it: `pass` when `delivered` is at least `minAmountOut`, else `fail` (a round 1 that reverted doesn't undo a round 2 that filled). With none filled: `pending` while one is not mined yet, else `fail`: it reverted or was never mined by 60s after its deadline (status `expired`, or `not_found` when the chain never saw it). Approvals are listed but don't change the result. `delivered` is what `recipient` received of `token` (the output), read from the swap transaction's Transfer logs, in base units. Also `block`, each transaction's `status`, and `reason`, one sentence on a fail or pending. The first result from a mined swap is final: asking again returns it.\n- **Limits:** one chain read per quote every 5s (the same `txHashes` inside that get the last answer; other hashes get 429 `receipt_rate_limited` with `retryAfterSec`), and at most 132 per quote (then 429 `receipt_reads_exhausted`, for good).\n- **Next:** `pass`: tell the user what they bought (`delivered` of `token`). `fail`: follow `next`: `requote` when no swap transaction succeeded (nothing filled; quote again), `stop` when one did (tell them `reason`, and don't trade again). `pending`: ask again in a few seconds.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReceiptRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "What the swap delivered, against the quote's `minAmountOut`.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "description": "swap_not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptErrorResponse"
+                },
+                "examples": {
+                  "swap_not_found": {
+                    "summary": "swap_not_found",
+                    "value": {
+                      "error": {
+                        "code": "swap_not_found",
+                        "message": "no /trade/v1/swap answer was issued for that quoteId in the last hour"
+                      },
+                      "next": "stop"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "413": {
+            "description": "payload_too_large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "description": "receipt_rate_limited / receipt_reads_exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "description": "internal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "503": {
+            "description": "rpc_unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReceiptErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
               }
             }
           }
@@ -2264,8 +3814,8 @@
                           },
                           "router": {
                             "kind": "contract",
-                            "address": "0x3e5e0a3Eae5C9CB5c4cAd22C9fA9D23c58CAAC33",
-                            "name": "Slipstream SwapRouter (AERODROME_ROUTER_ADDRESS)",
+                            "address": "0x57025fb592d9832b05d11097058c475b3ed97421",
+                            "name": "Slipstream SwapRouter",
                             "executable": true
                           },
                           "executable": true,
@@ -2388,6 +3938,11 @@
                   }
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
             }
           },
           "500": {
@@ -2397,6 +3952,11 @@
                 "schema": {
                   "$ref": "#/components/schemas/ErrorBody"
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
               }
             }
           }
@@ -2410,7 +3970,7 @@
           "trade"
         ],
         "summary": "Model Context Protocol endpoint (paid tools over x402)",
-        "description": "The trade API as MCP tools, paid per call with x402.\n\n- **Tools:** every other operation here except `openapi`, named by operationId (tradeSearch, tradeQuote, tradeSwap, tradeVenues, health), with the same input schema and the same price.\n- **Cost:** tradeSearch, tradeQuote and tradeSwap are paid per call over Arc USDC; tradeVenues and health are free. An unpaid `tools/call` returns a tool result with `isError: true` and the payment requirements in `structuredContent`. Sign them and retry with the payment payload in `params._meta[\"x402/payment\"]`; the receipt comes back in `result._meta[\"x402/payment-response\"]`. A result with `isError: true` never settles.\n- **Client:** use an x402-aware MCP client, e.g. `createx402MCPClient` from `@x402/mcp`.\n- **Transport:** Streamable HTTP, stateless, JSON responses. Send `Accept: application/json, text/event-stream` or the server answers 406. One JSON-RPC message per request (batches are rejected); bodies up to 16kb.",
+        "description": "The trade API as MCP tools, paid per call with x402.\n\n- **Tools:** every other operation here except `openapi`, named by operationId (tradeSearch, tradeQuote, tradeSwap, tradeReceipt, tradeVenues, health), with the same input schema and the same price.\n- **Cost:** tradeSearch, tradeQuote and tradeSwap are paid per call over Arc USDC; tradeReceipt, tradeVenues and health are free. An unpaid `tools/call` returns a tool result with `isError: true` and the payment requirements in `structuredContent`. Sign them and retry with the payment payload in `params._meta[\"x402/payment\"]`; the receipt comes back in `result._meta[\"x402/payment-response\"]`. A result with `isError: true` never settles.\n- **Errors:** two error results are @x402/mcp's own and carry no `next`: that payment-required one, and a text-only `Internal Server Error` when the facilitator fails mid-call. Every other error result carries the HTTP route's error body, `next` included, in `structuredContent` and the text content; a call the server refuses (an unknown tool, or arguments the input schema rejects) is `invalid_request`, `next: fix_request`.\n- **Client:** use an x402-aware MCP client, e.g. `createx402MCPClient` from `@x402/mcp`.\n- **Transport:** Streamable HTTP, stateless, JSON responses. Send `Accept: application/json, text/event-stream` or the server answers 406. One JSON-RPC message per request (batches are rejected); bodies up to 16kb.",
         "security": [],
         "parameters": [
           {
@@ -2525,10 +4085,20 @@
                   ]
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
             }
           },
           "202": {
-            "description": "Accepted: a JSON-RPC notification (no response body)."
+            "description": "Accepted: a JSON-RPC notification (no response body).",
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
           },
           "400": {
             "description": "malformed JSON, not a valid JSON-RPC message, or a JSON-RPC batch (not supported)",
@@ -2537,6 +4107,11 @@
                 "schema": {
                   "type": "object"
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
               }
             }
           },
@@ -2548,6 +4123,11 @@
                   "type": "object"
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
             }
           },
           "413": {
@@ -2558,6 +4138,11 @@
                   "$ref": "#/components/schemas/ErrorBody"
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
             }
           },
           "500": {
@@ -2567,6 +4152,11 @@
                 "schema": {
                   "$ref": "#/components/schemas/ErrorBody"
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
               }
             }
           }
@@ -2602,23 +4192,23 @@
                         "importedAt": 1790388601
                       },
                       "rulesVersion": "r2-383954828c",
-                      "commit": "781fef165e1744898169ddb4b258443f9b3d94da",
+                      "commit": null,
                       "caches": {
                         "response": {
                           "hits": 0,
-                          "misses": 2,
-                          "size": 1,
-                          "bytes": 2998
+                          "misses": 4,
+                          "size": 2,
+                          "bytes": 14867
                         },
                         "candidates": {
                           "hits": 0,
-                          "misses": 1,
-                          "size": 1,
-                          "bytes": 118
+                          "misses": 2,
+                          "size": 2,
+                          "bytes": 6494806
                         },
                         "generations": {
-                          "keys": 8,
-                          "bumps": 16
+                          "keys": 31,
+                          "bumps": 41
                         },
                         "abuse": {
                           "missCacheSize": 0,
@@ -2628,7 +4218,7 @@
                         "singleflight": {
                           "response": {
                             "hits": 0,
-                            "leaders": 1
+                            "leaders": 2
                           },
                           "probe": {
                             "hits": 0,
@@ -2636,23 +4226,26 @@
                           },
                           "depth": {
                             "hits": 0,
-                            "leaders": 1
+                            "leaders": 2
                           }
                         },
                         "quote": {
-                          "lastEthCalls": 1,
-                          "lastSafetyEthCalls": 3,
+                          "lastEthCalls": 3,
+                          "lastSafetyEthCalls": 0,
                           "lastCollapsed": false
                         }
                       },
                       "rpc": {
                         "counts": {
-                          "arc_anvil_local:eth_getCode": 4,
-                          "arc_anvil_local:eth_call": 5,
-                          "arc_anvil_local:eth_getBlockByNumber": 4,
-                          "arc_anvil_local:eth_simulateV1": 9
+                          "arc_anvil_local:eth_getCode": 6,
+                          "arc_anvil_local:eth_call": 40,
+                          "arc_anvil_local:eth_getBlockByNumber": 25,
+                          "arc_anvil_local:eth_simulateV1": 33,
+                          "arc_anvil_local:eth_getBalance": 15,
+                          "arc_anvil_local:eth_getTransactionByHash": 9,
+                          "arc_anvil_local:eth_getTransactionReceipt": 9
                         },
-                        "total": 22,
+                        "total": 137,
                         "endpoints": [
                           {
                             "id": "arc_anvil_local",
@@ -2673,9 +4266,9 @@
                               "probe",
                               "backfill"
                             ],
-                            "calls": 22,
+                            "calls": 137,
                             "budget": {
-                              "used": 445,
+                              "used": 3232,
                               "limit": null,
                               "pct": 0,
                               "state": "ok"
@@ -2688,27 +4281,35 @@
                                 "spillover": false
                               },
                               "call": {
-                                "used": 261,
+                                "used": 2141,
                                 "limit": null,
                                 "reserveMonthly": null,
                                 "spillover": false
                               },
                               "simulate": {
-                                "used": 184,
+                                "used": 1091,
                                 "limit": null,
                                 "reserveMonthly": null,
                                 "spillover": false
                               }
+                            },
+                            "queue": {
+                              "waiting": 0,
+                              "max": 180000,
+                              "rejected": 0
                             }
                           }
                         ]
                       },
                       "spend": {
                         "counts": {
-                          "arc_anvil_local:eth_getCode": 4,
-                          "arc_anvil_local:eth_call": 5,
-                          "arc_anvil_local:eth_getBlockByNumber": 4,
-                          "arc_anvil_local:eth_simulateV1": 9
+                          "arc_anvil_local:eth_getCode": 6,
+                          "arc_anvil_local:eth_call": 40,
+                          "arc_anvil_local:eth_getBlockByNumber": 25,
+                          "arc_anvil_local:eth_simulateV1": 33,
+                          "arc_anvil_local:eth_getBalance": 15,
+                          "arc_anvil_local:eth_getTransactionByHash": 9,
+                          "arc_anvil_local:eth_getTransactionReceipt": 9
                         },
                         "month": [
                           {
@@ -2763,36 +4364,48 @@
                             "provider": "arc_anvil_local",
                             "method": "eth_getCode",
                             "month": "2026-09",
-                            "calls": 46
+                            "calls": 493
                           },
                           {
                             "provider": "arc_anvil_local",
                             "method": "eth_call",
                             "month": "2026-09",
-                            "calls": 144
+                            "calls": 948
                           },
                           {
                             "provider": "arc_anvil_local",
                             "method": "eth_getBlockByNumber",
                             "month": "2026-09",
-                            "calls": 85
+                            "calls": 577
                           },
                           {
                             "provider": "arc_anvil_local",
                             "method": "eth_simulateV1",
                             "month": "2026-09",
-                            "calls": 149
+                            "calls": 857
                           },
                           {
                             "provider": "arc_anvil_local",
                             "method": "eth_getBalance",
                             "month": "2026-09",
-                            "calls": 21
+                            "calls": 199
+                          },
+                          {
+                            "provider": "arc_anvil_local",
+                            "method": "eth_getTransactionByHash",
+                            "month": "2026-09",
+                            "calls": 79
+                          },
+                          {
+                            "provider": "arc_anvil_local",
+                            "method": "eth_getTransactionReceipt",
+                            "month": "2026-09",
+                            "calls": 79
                           }
                         ],
                         "budgets": {
                           "arc_anvil_local": {
-                            "used": 445,
+                            "used": 3232,
                             "limit": null,
                             "pct": 0,
                             "state": "ok"
@@ -2805,10 +4418,10 @@
                         "collapsed": 0,
                         "dropped": 0,
                         "running": 0,
-                        "done": 2,
+                        "done": 0,
                         "failed": 0,
-                        "simulateCalls": 6,
-                        "skippedPinned": 0
+                        "simulateCalls": 0,
+                        "skippedPinned": 2
                       },
                       "payerIdentity": "x402",
                       "x402": {
@@ -2819,6 +4432,11 @@
                   }
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
             }
           },
           "500": {
@@ -2828,6 +4446,11 @@
                 "schema": {
                   "$ref": "#/components/schemas/ErrorBody"
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
               }
             }
           }
@@ -2852,6 +4475,11 @@
                   "type": "object"
                 }
               }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
             }
           },
           "500": {
@@ -2861,6 +4489,11 @@
                 "schema": {
                   "$ref": "#/components/schemas/ErrorBody"
                 }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
               }
             }
           }
@@ -3113,6 +4746,29 @@
         "required": [
           "quoteId",
           "taker"
+        ],
+        "additionalProperties": false
+      },
+      "ReceiptRequest": {
+        "type": "object",
+        "properties": {
+          "quoteId": {
+            "type": "string",
+            "pattern": "^q_[0-9a-f]{16,}$"
+          },
+          "txHashes": {
+            "minItems": 1,
+            "maxItems": 4,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^0x[0-9a-fA-F]{64}$"
+            }
+          }
+        },
+        "required": [
+          "quoteId",
+          "txHashes"
         ],
         "additionalProperties": false
       },
@@ -4126,10 +5782,29 @@
               "code"
             ],
             "additionalProperties": false
+          },
+          "next": {
+            "description": "What to do next. requote: get a new quote, then swap its quoteId. retry: send the same request again, after retryAfterSec when given. fix_request: the request itself is wrong; change it first. stop: don't retry; tell the user. pay: pay the 402 and send the same request again. sign_permit: sign signatures[0].typedData and call POST /trade/v1/swap again with `permit`.",
+            "type": "string",
+            "enum": [
+              "requote",
+              "retry",
+              "fix_request",
+              "stop",
+              "pay",
+              "sign_permit"
+            ]
+          },
+          "retryAfterSec": {
+            "description": "Seconds until the same request can succeed. Only where the server knows it: lookup_rate_limited and receipt_rate_limited.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
           }
         },
         "required": [
-          "error"
+          "error",
+          "next"
         ],
         "additionalProperties": false
       },
@@ -5101,6 +6776,188 @@
         ],
         "additionalProperties": false
       },
+      "QuoteReadinessOut": {
+        "description": "Present only when the request names `taker`: can that wallet finish this trade, and what will it cost.",
+        "type": "object",
+        "properties": {
+          "taker": {
+            "type": "string",
+            "pattern": "^0x[0-9a-f]{40}$"
+          },
+          "balance": {
+            "description": "The input token.",
+            "type": "object",
+            "properties": {
+              "token": {
+                "type": "string",
+                "pattern": "^0x[0-9a-f]{40}$"
+              },
+              "required": {
+                "description": "Raw units of the input token: the amountIn POST /trade/v1/swap spends, for exactOut too (not maxAmountIn). USDC is 6 dp.",
+                "type": "string",
+                "pattern": "^\\d+$"
+              },
+              "available": {
+                "description": "The taker's raw balance of the input token. For USDC, the native balance converted to 6 dp (one balance, native and ERC-20).",
+                "type": "string",
+                "pattern": "^\\d+$"
+              },
+              "enough": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "token",
+              "required",
+              "available",
+              "enough"
+            ],
+            "additionalProperties": false
+          },
+          "approval": {
+            "description": "What POST /trade/v1/swap with the default `approval: \"permit2\"` needs first. approve: an ERC-20 approve to Permit2. sign_permit: a Permit2 signature (swap returns the typed data). native: the route is paid in native USDC, nothing needed.",
+            "type": "object",
+            "properties": {
+              "mode": {
+                "type": "string",
+                "const": "permit2"
+              },
+              "needs": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "approve",
+                  "sign_permit",
+                  "approve_and_sign_permit",
+                  "native"
+                ]
+              }
+            },
+            "required": [
+              "mode",
+              "needs"
+            ],
+            "additionalProperties": false
+          },
+          "approve": {
+            "description": "The same for `approval: \"approve\"`: an ERC-20 approve to ArcgateRouter, or nothing.",
+            "type": "object",
+            "properties": {
+              "needs": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "approve",
+                  "native"
+                ]
+              }
+            },
+            "required": [
+              "needs"
+            ],
+            "additionalProperties": false
+          },
+          "gas": {
+            "description": "Gas, paid in native USDC.",
+            "type": "object",
+            "properties": {
+              "estimatedUsdc": {
+                "description": "best.gasUsdc plus any approve and Permit2 gas the permit2 plan needs, at the quote's base fee.",
+                "type": "string",
+                "pattern": "^\\d+(\\.\\d+)?$"
+              },
+              "available": {
+                "description": "The taker's native USDC left for gas: after the trade amount for a USDC input, and after both arcgate fees when the taker pays them in USDC.",
+                "type": "string",
+                "pattern": "^\\d+(\\.\\d+)?$"
+              },
+              "enough": {
+                "description": "available covers the gas with POST /trade/v1/swap's 1.3x margin, the check it runs itself; estimatedUsdc is the unmargined cost.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "estimatedUsdc",
+              "available",
+              "enough"
+            ],
+            "additionalProperties": false
+          },
+          "fees": {
+            "description": "The arcgate fee still to pay.",
+            "type": "object",
+            "properties": {
+              "swapUsdc": {
+                "description": "The POST /trade/v1/swap price for this quote; 0 when payment is off. This quote is already paid; the Permit2 round is free.",
+                "type": "string",
+                "pattern": "^\\d+(\\.\\d+)?$"
+              },
+              "payer": {
+                "description": "The x402 payer of this quote call; null when payment is off or the payer is unknown.",
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^0x[0-9a-f]{40}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "payerAvailable": {
+                "description": "The payer's balance of the fee asset less this quote's own fee, which settles after this answer; null when payer is null or the fee settles on another chain.",
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^\\d+(\\.\\d+)?$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "enough": {
+                "description": "payerAvailable >= swapUsdc; null when payerAvailable is null (not counted against `ready`).",
+                "anyOf": [
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "swapUsdc",
+              "payer",
+              "payerAvailable",
+              "enough"
+            ],
+            "additionalProperties": false
+          },
+          "totalCostUsdc": {
+            "description": "fees.swapUsdc + gas.estimatedUsdc: what finishing costs.",
+            "type": "string",
+            "pattern": "^\\d+(\\.\\d+)?$"
+          },
+          "ready": {
+            "description": "balance.enough and gas.enough, and fees.enough is not false. When false, `next` is `stop`.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "taker",
+          "balance",
+          "approval",
+          "approve",
+          "gas",
+          "fees",
+          "totalCostUsdc",
+          "ready"
+        ],
+        "additionalProperties": false
+      },
       "QuoteResponse": {
         "type": "object",
         "properties": {
@@ -5189,6 +7046,21 @@
               {
                 "type": "null"
               }
+            ]
+          },
+          "readiness": {
+            "$ref": "#/components/schemas/QuoteReadinessOut"
+          },
+          "next": {
+            "description": "What to do next. requote: get a new quote, then swap its quoteId. retry: send the same request again, after retryAfterSec when given. fix_request: the request itself is wrong; change it first. stop: don't retry; tell the user. pay: pay the 402 and send the same request again. sign_permit: sign signatures[0].typedData and call POST /trade/v1/swap again with `permit`.",
+            "type": "string",
+            "enum": [
+              "requote",
+              "retry",
+              "fix_request",
+              "stop",
+              "pay",
+              "sign_permit"
             ]
           }
         },
@@ -5292,10 +7164,29 @@
               "message"
             ],
             "additionalProperties": false
+          },
+          "next": {
+            "description": "What to do next. requote: get a new quote, then swap its quoteId. retry: send the same request again, after retryAfterSec when given. fix_request: the request itself is wrong; change it first. stop: don't retry; tell the user. pay: pay the 402 and send the same request again. sign_permit: sign signatures[0].typedData and call POST /trade/v1/swap again with `permit`.",
+            "type": "string",
+            "enum": [
+              "requote",
+              "retry",
+              "fix_request",
+              "stop",
+              "pay",
+              "sign_permit"
+            ]
+          },
+          "retryAfterSec": {
+            "description": "Seconds until the same request can succeed. Only where the server knows it: lookup_rate_limited and receipt_rate_limited.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
           }
         },
         "required": [
-          "error"
+          "error",
+          "next"
         ],
         "additionalProperties": false
       },
@@ -5588,6 +7479,18 @@
             "items": {
               "$ref": "#/components/schemas/SwapWarningOut"
             }
+          },
+          "next": {
+            "description": "What to do next. requote: get a new quote, then swap its quoteId. retry: send the same request again, after retryAfterSec when given. fix_request: the request itself is wrong; change it first. stop: don't retry; tell the user. pay: pay the 402 and send the same request again. sign_permit: sign signatures[0].typedData and call POST /trade/v1/swap again with `permit`.",
+            "type": "string",
+            "enum": [
+              "requote",
+              "retry",
+              "fix_request",
+              "stop",
+              "pay",
+              "sign_permit"
+            ]
           }
         },
         "required": [
@@ -5633,7 +7536,7 @@
                 "type": "string"
               },
               "details": {
-                "description": "On a 400 invalid_request from body validation: an array of issues ({code, path, message}); other invalid_request cases carry no details. Otherwise, when present, an object of code-specific context, e.g. {requoted, min} / {call, reason} / {delivered, minAmountOut} on quote_stale, or {required, available, token} / {required, available, reason: \"gas\"} on insufficient_balance. Amounts are base-unit strings, except a USDC input's balance amounts, which are native 18-decimal units."
+                "description": "On a 400 invalid_request from body validation: an array of issues ({code, path, message}); other invalid_request cases carry no details. Otherwise, when present, an object of code-specific context, e.g. {requoted, min} / {call, reason} / {delivered, minAmountOut} on quote_stale, or {required, available, token} / {required, available, reason: \"gas\", swapFee?} on insufficient_balance: those are native 18-decimal amounts, whatever the input (swapFee: this call's own fee, counted when the taker is the x402 payer and pays in USDC on this chain, issue #140). Amounts are base-unit strings, except a USDC input's balance amounts, which are native 18-decimal units."
               }
             },
             "required": [
@@ -5641,10 +7544,240 @@
               "message"
             ],
             "additionalProperties": false
+          },
+          "next": {
+            "description": "What to do next. requote: get a new quote, then swap its quoteId. retry: send the same request again, after retryAfterSec when given. fix_request: the request itself is wrong; change it first. stop: don't retry; tell the user. pay: pay the 402 and send the same request again. sign_permit: sign signatures[0].typedData and call POST /trade/v1/swap again with `permit`.",
+            "type": "string",
+            "enum": [
+              "requote",
+              "retry",
+              "fix_request",
+              "stop",
+              "pay",
+              "sign_permit"
+            ]
+          },
+          "retryAfterSec": {
+            "description": "Seconds until the same request can succeed. Only where the server knows it: lookup_rate_limited and receipt_rate_limited.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "quote": {
+            "description": "On 409 quote_stale or 410 quote_expired: a free, fresh quote of the original quote request (same amount, tokens, side, slippageBps and venues; the default ttlSec; when the original named a taker, the wallet calling /trade/v1/swap is the taker), exactly as POST /trade/v1/quote answers it. Nothing executes on it: check its price, safety.verdict and readiness, then swap its quoteId. One per paid quote: absent on a second 409/410 for the same quoteId, for a quote that itself came from here, for a quote expired over 5 minutes, and when the re-quote couldn't run (quote again yourself). Absent with next: stop when the fresh quote can't be traded; error.hint then says why.",
+            "$ref": "#/components/schemas/QuoteResponse"
           }
         },
         "required": [
-          "error"
+          "error",
+          "next"
+        ],
+        "additionalProperties": false
+      },
+      "ReceiptTransactionOut": {
+        "type": "object",
+        "properties": {
+          "hash": {
+            "type": "string",
+            "pattern": "^0x[0-9a-f]{64}$"
+          },
+          "purpose": {
+            "description": "\"swap\" for a transaction to ArcgateRouter, \"approve\" for one to the input token; null while the chain doesn't know the transaction.",
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "approve",
+                  "swap"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "status": {
+            "description": "\"expired\": a swap transaction the chain knows but never mined, now past its deadline; it can only revert. \"not_found\": a transaction the chain doesn't know, past the swap's deadline.",
+            "type": "string",
+            "enum": [
+              "success",
+              "reverted",
+              "pending",
+              "expired",
+              "not_found"
+            ]
+          },
+          "block": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "hash",
+          "purpose",
+          "status",
+          "block"
+        ],
+        "additionalProperties": false
+      },
+      "ReceiptResponse": {
+        "type": "object",
+        "properties": {
+          "quoteId": {
+            "type": "string",
+            "pattern": "^q_[0-9a-f]{16,}$"
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "pass",
+              "fail",
+              "pending"
+            ]
+          },
+          "token": {
+            "type": "string",
+            "pattern": "^0x[0-9a-f]{40}$"
+          },
+          "recipient": {
+            "type": "string",
+            "pattern": "^0x[0-9a-f]{40}$"
+          },
+          "minAmountOut": {
+            "type": "string",
+            "pattern": "^\\d+$"
+          },
+          "delivered": {
+            "description": "What `recipient` received of `token`, from the swap transactions' Transfer logs, in base units. null until every swap transaction is mined.",
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^\\d+$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "block": {
+            "description": "The highest block among the swap transactions; null until one is mined.",
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "transactions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReceiptTransactionOut"
+            }
+          },
+          "reason": {
+            "description": "One sentence on a fail or pending result; null on pass.",
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next": {
+            "description": "Issue #123: retry while pending. After a fail, requote when no swap transaction succeeded, stop when one did (don't trade again); absent on pass.",
+            "type": "string",
+            "enum": [
+              "requote",
+              "retry",
+              "fix_request",
+              "stop",
+              "pay",
+              "sign_permit"
+            ]
+          }
+        },
+        "required": [
+          "quoteId",
+          "result",
+          "token",
+          "recipient",
+          "minAmountOut",
+          "delivered",
+          "block",
+          "transactions",
+          "reason"
+        ],
+        "additionalProperties": false
+      },
+      "ReceiptErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "invalid_request",
+                  "swap_not_found",
+                  "receipt_rate_limited",
+                  "receipt_reads_exhausted",
+                  "internal",
+                  "rpc_unavailable"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "hint": {
+                "type": "string"
+              },
+              "details": {
+                "description": "On a 400 invalid_request from body validation: an array of issues ({code, path, message}). Otherwise absent."
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          },
+          "next": {
+            "description": "What to do next. requote: get a new quote, then swap its quoteId. retry: send the same request again, after retryAfterSec when given. fix_request: the request itself is wrong; change it first. stop: don't retry; tell the user. pay: pay the 402 and send the same request again. sign_permit: sign signatures[0].typedData and call POST /trade/v1/swap again with `permit`.",
+            "type": "string",
+            "enum": [
+              "requote",
+              "retry",
+              "fix_request",
+              "stop",
+              "pay",
+              "sign_permit"
+            ]
+          },
+          "retryAfterSec": {
+            "description": "Seconds until the same request can succeed. Only where the server knows it: lookup_rate_limited and receipt_rate_limited.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "error",
+          "next"
         ],
         "additionalProperties": false
       },
@@ -5767,6 +7900,55 @@
             ]
           }
         ]
+      },
+      "PaymentRequiredBody": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "const": "payment_required"
+              },
+              "message": {
+                "type": "string"
+              },
+              "hint": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message",
+              "hint"
+            ],
+            "additionalProperties": false
+          },
+          "next": {
+            "description": "What to do next. requote: get a new quote, then swap its quoteId. retry: send the same request again, after retryAfterSec when given. fix_request: the request itself is wrong; change it first. stop: don't retry; tell the user. pay: pay the 402 and send the same request again. sign_permit: sign signatures[0].typedData and call POST /trade/v1/swap again with `permit`.",
+            "type": "string",
+            "enum": [
+              "requote",
+              "retry",
+              "fix_request",
+              "stop",
+              "pay",
+              "sign_permit"
+            ]
+          },
+          "retryAfterSec": {
+            "description": "Seconds until the same request can succeed. Only where the server knows it: lookup_rate_limited and receipt_rate_limited.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "error",
+          "next"
+        ],
+        "additionalProperties": false
       },
       "PaymentPayload": {
         "type": "object",
@@ -5961,7 +8143,7 @@
             "$ref": "#/components/schemas/PaymentPayload"
           }
         },
-        "example": "eyJ4NDAyVmVyc2lvbiI6MiwicGF5bG9hZCI6eyJhdXRob3JpemF0aW9uIjp7ImZyb20iOiIweDVFZGZmODJGMEU3REMyNTk2OGNiYThCNjE0YmVERDc4MmFjMmNFREQiLCJ0byI6IjB4OTg3RjcxOWI1MTZmNTI4ZjQwODBFRjA4NTNFMzdhRDVkN0U3NzNBMCIsInZhbHVlIjoiNTAwMCIsInZhbGlkQWZ0ZXIiOiIwIiwidmFsaWRCZWZvcmUiOiIxNzkwNDQ0NTAwIiwibm9uY2UiOiIweGViOTJhMzI2MGM3NGIzMmRiNjBhYzlkN2M1ZTVjNGM5YjVmNWVmMTE1MDY3YTU3NDNlNDMwNjk0MGQwZWQ4ZDkifSwic2lnbmF0dXJlIjoiMHgwNzU1MjQxMTAyNTE4M2MzMzEwOWY2NTIzNjA5MDVhNmZmMGY1Njg0YWE1YmJmYzdjNzZhMjIyNTYxNDVhYTBmNTRjNzg4MDVhNGJlMjY4YThjZDk3NzQ1ZTAwMTk3ZmE5YjgxZDlhZWZjYTcwMDczMzgzZjI3M2I5OTA2YzJiYTFiIn0sInJlc291cmNlIjp7InVybCI6Imh0dHBzOi8vYXBpLmFyY2dhdGUuZGV2L3RyYWRlL3YxL3NlYXJjaCIsImRlc2NyaXB0aW9uIjoiVG9rZW4gc2VhcmNoIiwibWltZVR5cGUiOiIifSwiYWNjZXB0ZWQiOnsic2NoZW1lIjoiZXhhY3QiLCJuZXR3b3JrIjoiZWlwMTU1OjUwNDIwMDIiLCJhbW91bnQiOiI1MDAwIiwiYXNzZXQiOiIweDM2MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLCJwYXlUbyI6IjB4OTg3RjcxOWI1MTZmNTI4ZjQwODBFRjA4NTNFMzdhRDVkN0U3NzNBMCIsIm1heFRpbWVvdXRTZWNvbmRzIjozMDAsImV4dHJhIjp7Im5hbWUiOiJVU0RDIiwidmVyc2lvbiI6IjIifX19"
+        "example": "eyJ4NDAyVmVyc2lvbiI6MiwicGF5bG9hZCI6eyJhdXRob3JpemF0aW9uIjp7ImZyb20iOiIweDVFZGZmODJGMEU3REMyNTk2OGNiYThCNjE0YmVERDc4MmFjMmNFREQiLCJ0byI6IjB4OTg3RjcxOWI1MTZmNTI4ZjQwODBFRjA4NTNFMzdhRDVkN0U3NzNBMCIsInZhbHVlIjoiNTAwMCIsInZhbGlkQWZ0ZXIiOiIwIiwidmFsaWRCZWZvcmUiOiIxNzkwNjk3OTMwIiwibm9uY2UiOiIweDZhMmNlZTQyZDc0ZWMwMjgyY2EzMTJlMDAwMTBhMzg1NGRkN2M5NjJiMDM2NGViYzZlNjU4MDI0Zjk3Nzk0MGMifSwic2lnbmF0dXJlIjoiMHhkMmE3M2MzYjFjN2MyZDQ2ZGJjOTUwZjliODhmY2NhMmVkZTY3ZGI1MWUxODY1ZDIxMmEzMmNjYzYwZmUxZjA5NGEzNmUxM2I1OWM0ZjI2ODEzZWMwNWVkNDdkOThhNWI4NWNkMmE4ZGMxOTQxMDdjYTVkZjNlNWUwNWJmODdmOTFjIn0sInJlc291cmNlIjp7InVybCI6Imh0dHBzOi8vYXBpLmFyY2dhdGUuZGV2L3RyYWRlL3YxL3NlYXJjaCIsImRlc2NyaXB0aW9uIjoiVG9rZW4gc2VhcmNoIiwibWltZVR5cGUiOiIifSwiYWNjZXB0ZWQiOnsic2NoZW1lIjoiZXhhY3QiLCJuZXR3b3JrIjoiZWlwMTU1OjUwNDIwMDIiLCJhbW91bnQiOiI1MDAwIiwiYXNzZXQiOiIweDM2MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLCJwYXlUbyI6IjB4OTg3RjcxOWI1MTZmNTI4ZjQwODBFRjA4NTNFMzdhRDVkN0U3NzNBMCIsIm1heFRpbWVvdXRTZWNvbmRzIjozMDAsImV4dHJhIjp7Im5hbWUiOiJVU0RDIiwidmVyc2lvbiI6IjIifX19"
       }
     },
     "securitySchemes": {
@@ -5974,16 +8156,26 @@
     },
     "responses": {
       "PaymentRequired": {
-        "description": "Payment required (x402 v2). Body is empty. Two cases: (1) no or invalid payment - the payment requirements are in the PAYMENT-REQUIRED header; (2) the payment verified and the handler succeeded, but settlement failed - the response carries a PAYMENT-RESPONSE header with `success: false` and an `errorReason`, the handler's result is discarded, and nothing was charged. Retry with a fresh payment in either case.",
+        "description": "Payment required (x402 v2). Two cases: (1) no or invalid payment - the payment requirements are in the PAYMENT-REQUIRED header. With no payment (or an undecodable one) the body is `{ error: { code: \"payment_required\", message, hint }, next: \"pay\" }`, the hint saying to allow Arc USDC in your x402 client and linking the docs; a payment of the wrong amount or one that fails verification gets `{}`; (2) the payment verified and the handler succeeded, but settlement failed - the response carries a PAYMENT-RESPONSE header with `success: false` and an `errorReason`, the handler's result is discarded, the body is `{}`, and nothing was charged. Retry with a fresh payment in either case. The `{}` bodies are written by the x402 middleware itself and carry no `next`.",
         "content": {
           "application/json": {
             "schema": {
-              "type": "object",
-              "additionalProperties": false
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/PaymentRequiredBody"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false
+                }
+              ]
             }
           }
         },
         "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          },
           "PAYMENT-REQUIRED": {
             "description": "Case (1). Base64 JSON payment requirements (PaymentRequired schema): scheme, network, amount, asset, payTo, maxTimeoutSeconds.",
             "schema": {
@@ -6017,7 +8209,22 @@
               "$ref": "#/components/schemas/X402MiddlewareError"
             }
           }
+        },
+        "headers": {
+          "X-Request-Id": {
+            "$ref": "#/components/headers/RequestId"
+          }
         }
+      }
+    },
+    "headers": {
+      "RequestId": {
+        "description": "This call's id in arcgate's logs. Quote it when reporting a problem with the call.",
+        "schema": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}$"
+        },
+        "example": "3f9a1c07"
       }
     }
   }

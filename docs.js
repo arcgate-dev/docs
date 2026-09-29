@@ -6,7 +6,7 @@
   var OPENAPI_DOWNLOAD = "none";
 
   // Operations are listed in the order a caller uses them, not alphabetically.
-  var OPERATION_ORDER = ["tradeSearch", "tradeQuote", "tradeSwap", "tradeVenues", "tradeMcp", "health", "openapi"];
+  var OPERATION_ORDER = ["tradeSearch", "tradeQuote", "tradeSwap", "tradeReceipt", "tradeVenues", "tradeMcp", "health", "openapi"];
   var TAG_ORDER = ["trade", "service"];
 
   function rank(list, key) {
