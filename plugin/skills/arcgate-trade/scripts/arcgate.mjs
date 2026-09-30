@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // arcgate trade API from an agent: one call per run, paying x402 with the wallet in PRIVATE_KEY.
 //
-//   node arcgate.mjs <search|quote|swap|receipt|venues|health> ['<json body>']
+//   node arcgate.mjs <search|quote|swap|swap-tx|receipt|venues|health> ['<json body>']
 //
 // Env:
 //   PRIVATE_KEY          the wallet that pays the fee, holding USDC on Arc (search, quote, swap)
@@ -22,6 +22,7 @@ export const OPERATIONS = {
   search: { method: "POST", path: "/trade/v1/search", paid: true },
   quote: { method: "POST", path: "/trade/v1/quote", paid: true },
   swap: { method: "POST", path: "/trade/v1/swap", paid: true },
+  "swap-tx": { method: "POST", path: "/trade/v1/swap/tx", paid: false },
   receipt: { method: "POST", path: "/trade/v1/receipt", paid: false },
   venues: { method: "GET", path: "/trade/v1/venues", paid: false },
   health: { method: "GET", path: "/health", paid: false },

@@ -3,7 +3,7 @@
   "info": {
     "title": "arcgate",
     "version": "0.1.0",
-    "description": "arcgate is a checkpoint between your agent and the DEXes on Arc. It finds the token you meant, the venues that can actually fill it, and whether the trade is safe, then prices it and hands back unsigned transactions. **It never holds funds and never signs.** Your wallet does both.\n\n# A checkpoint, not a DEX\n\nThree paid calls, in this order, then your wallet takes over, and a free receipt tells you whether it landed.\n\n<ol>\n<li><code>search</code><strong>Right token.</strong><span>Every contract with the name you asked for, ranked, with impostors flagged by identity. Pick the address you meant.</span></li>\n<li><code>quote</code><strong>Right venue, safe to trade, best price.</strong><span>Only pools that exist and hold liquidity at this block. A simulated buy and sell-back from a fresh wallet. Prices at parity with KyberSwap. Returns a quoteId that is good for 120 seconds. Name your <code>taker</code> and it also says whether that wallet can finish the trade, and what finishing costs (<code>readiness</code>).</span></li>\n<li><code>swap</code><strong>Unsigned transactions.</strong><span>The quoteId and your taker address become the transactions to send, any approvals first, then the swap, re-simulated from your wallet first, and executed through arcgate's own ArcgateRouter contract. Approvals your allowance already covers are skipped, and a route funded entirely by native USDC needs no approval or signature at all. With the default Permit2 approval you may otherwise get a permit to sign, and then you call swap again with it, free.</span></li>\n<li><code>sign</code><strong>Your wallet signs.</strong><span>And broadcasts. arcgate never does.</span></li>\n<li><code>receipt</code><strong>Did it land?</strong><span>Free. Send the quoteId and your transaction hashes; get back what you received against minAmountOut, and pass or fail.</span></li>\n</ol>\n\n# Paying arcgate from your own code\n\n`search`, `quote` and `swap` are paid per call with [x402](https://x402.org) v2, in USDC on Arc. No API keys, no accounts.\n\n1. Call the endpoint with no payment. The answer is `402 Payment Required`, with the requirements (scheme, network, amount, asset, `payTo`, timeout) base64-encoded in the `PAYMENT-REQUIRED` header.\n2. Sign an EIP-3009 authorization for that amount and retry the **same** request with the signed payload, base64-encoded, in `PAYMENT-SIGNATURE`.\n3. A paid response carries the settlement receipt in `PAYMENT-RESPONSE`.\n\nAny x402 client runs that loop for you. Fees are paid in **real USDC on Arc mainnet**, the same chain the trade runs on. Arc USDC isn't one of x402's built-in assets (the standard client libraries ship USDC for Base only), so the client must allow it explicitly, or every payment is refused before it's signed. In JavaScript, that's `spendControls.allowedAssets` with network `eip155:5042`, asset `0x3600000000000000000000000000000000000000` and a per-payment maximum, as in the example below. Install once:\n\n```bash\nnpm install @x402/fetch @x402/core @x402/evm viem\n# Python: pip install \"x402[evm,requests]\"\n```\n\nThe example follows the language picked under **Client Libraries**. Its first call is one paid `search` (0.005 USDC), which proves the setup; the calls after it are the whole trade:\n\n```js\nimport { wrapFetchWithPayment } from \"@x402/fetch\";\nimport { x402Client } from \"@x402/core/client\";\nimport { ExactEvmScheme } from \"@x402/evm/exact/client\";\nimport { privateKeyToAccount } from \"viem/accounts\";\n\n// The server shown on this page.\nconst API = process.env.API_URL;\n// Holds USDC on Arc mainnet: fees are real.\nconst signer =\n  privateKeyToAccount(process.env.PRIVATE_KEY);\n// The address you picked from search.\nconst TOKEN = \"0x…\";\n\n// Fees are paid on Arc mainnet. (A local dev stack\n// charges on Arc testnet: \"eip155:5042002\".)\nconst FEE_NETWORK = \"eip155:5042\";\nconst USDC =\n  \"0x3600000000000000000000000000000000000000\";\n\nconst x402 = x402Client.fromConfig({\n  schemes: [{\n    network: FEE_NETWORK,\n    client: new ExactEvmScheme(signer),\n  }],\n  // Allow Arc USDC, capped per payment at the top\n  // swap fee (5 USDC).\n  spendControls: {\n    allowedAssets: [{\n      network: FEE_NETWORK,\n      asset: USDC,\n      maxAmountPerPayment: \"5000000\",\n    }],\n  },\n});\nconst pay = wrapFetchWithPayment(fetch, x402);\n\nasync function call(path, body) {\n  const res = await pay(`${API}/trade/v1/${path}`, {\n    method: \"POST\",\n    headers: { \"content-type\": \"application/json\" },\n    body: JSON.stringify(body),\n  });\n  const json = await res.json();\n  // Errors are never charged.\n  if (!res.ok) {\n    const code = json.error?.code;\n    throw new Error(`${path}: ${res.status} ${code}`);\n  }\n  return json;\n}\n\n// 0.005 USDC: the first paid call. If this returns\n// results, Arc USDC is allowed and the wallet pays.\nconst found = await call(\"search\", { query: \"USDC\" });\n\n// 0.01 USDC: route, round-trip loss, 120 second\n// expiry. Sells 100 USDC.\nconst quote = await call(\"quote\", {\n  sell: USDC, buy: TOKEN, amount: \"100\",\n});\n\n// 0.01 to 5 USDC by size. approval \"approve\" is\n// always one call: at most one exact-amount ERC-20\n// approve(ArcgateRouter, amountIn), no Permit2, no\n// signature. The default, \"permit2\", can return a\n// permit to sign and a second call, which is free.\nconst swap = await call(\"swap\", {\n  quoteId: quote.quoteId,\n  taker: signer.address,\n  approval: \"approve\",\n});\n\n// swap.transactions: approvals still needed, then\n// the swap, all unsigned. Read what you sign. Your\n// wallet signs and sends each one, in order.\n```\n\n```python\n# pip install \"x402[evm,requests]\"\nimport os\nfrom eth_account import Account\nfrom x402 import (\n    SchemeRegistration,\n    x402ClientConfig,\n    x402ClientSync,\n)\nfrom x402.http.clients import x402_requests\nfrom x402.mechanisms.evm.exact import (\n    ExactEvmClientScheme)\n\n# The server shown on this page.\nAPI = os.environ[\"API_URL\"]\n# Holds USDC on Arc mainnet: fees are real.\naccount = Account.from_key(os.environ[\"PRIVATE_KEY\"])\n# The address you picked from search.\nTOKEN = \"0x…\"\n\n# Fees are paid on Arc mainnet. (A local dev stack\n# charges on Arc testnet: \"eip155:5042002\".)\nFEE_NETWORK = \"eip155:5042\"\nUSDC = \"0x3600000000000000000000000000000000000000\"\n\nx402 = x402ClientSync.from_config(x402ClientConfig(\n    schemes=[SchemeRegistration(\n        network=FEE_NETWORK,\n        client=ExactEvmClientScheme(account),\n    )],\n    # Allow Arc USDC, capped per payment at the top\n    # swap fee (5 USDC).\n    spend_controls={\"allowed_assets\": [{\n        \"network\": FEE_NETWORK,\n        \"asset\": USDC,\n        \"max_amount_per_payment\": \"5000000\",\n    }]},\n))\nsession = x402_requests(x402)\n\ndef call(path, body):\n    url = f\"{API}/trade/v1/{path}\"\n    res = session.post(url, json=body)\n    data = res.json()\n    # Errors are never charged.\n    if not res.ok:\n        code = data[\"error\"][\"code\"]\n        raise RuntimeError(\n            f\"{path}: {res.status_code} {code}\")\n    return data\n\n# 0.005 USDC: the first paid call. If this returns\n# results, Arc USDC is allowed and the wallet pays.\nfound = call(\"search\", {\"query\": \"USDC\"})\n\n# 0.01 USDC: route, round-trip loss, 120 second\n# expiry. Sells 100 USDC.\nquote = call(\"quote\", {\n    \"sell\": USDC, \"buy\": TOKEN, \"amount\": \"100\",\n})\n\n# 0.01 to 5 USDC by size. approval \"approve\" is\n# always one call: at most one exact-amount approve,\n# no Permit2, no signature.\nswap = call(\"swap\", {\n    \"quoteId\": quote[\"quoteId\"],\n    \"taker\": account.address,\n    \"approval\": \"approve\",\n})\n\n# swap[\"transactions\"]: approvals still needed, then\n# the swap, all unsigned. Read what you sign. Your\n# wallet signs and sends each one, in order.\n```\n\n```bash\n# Free calls work from curl as they are.\ncurl \"$API_URL/trade/v1/venues\"\ncurl \"$API_URL/health\"\n\n# A paid call answers 402, with its price in\n# PAYMENT-REQUIRED (base64 JSON).\nUSDC=0x3600000000000000000000000000000000000000\nTOKEN=0x…   # the address you picked from search\nBODY=\"{\\\"sell\\\":\\\"$USDC\\\",\\\"buy\\\":\\\"$TOKEN\\\",\"\nBODY+=\"\\\"amount\\\":\\\"100\\\"}\"\ncurl -s -D - -o /dev/null \\\n  -X POST \"$API_URL/trade/v1/quote\" \\\n  -H 'content-type: application/json' -d \"$BODY\" \\\n  | grep -i '^payment-required' | cut -d' ' -f2 \\\n  | tr -d '\\r' | base64 -d\n\n# curl can't sign the EIP-3009 payment for the\n# retry. Pay with the JavaScript or Python client\n# (pick it under Client Libraries), or connect over\n# MCP below.\n```\n\n# Prices\n\n| Operation | USDC per call |\n| --- | --- |\n| `search` | 0.005 |\n| `quote` | 0.01 |\n| `swap` under 1k | 0.01 |\n| `swap` 1k to 10k | 0.05 |\n| `swap` over 10k | 0.05 + 0.5 bps above 10k, capped at 5 |\n| `venues`, `health`, `openapi` | free |\n\nErrors are never charged. A `cannot_sell` safety verdict on a quote is an answer, so it is charged. `insufficient_liquidity` (`422`) and an expired quote (`410`) are free. Nothing is taken from your swap output. `swap` is charged once per quote: when the default Permit2 approval needs a second `swap` call with the signed permit, that call is free.\n\n# Calling the API\n\nEvery operation has a **Test Request** button that calls the API from this page. Free operations, `venues` and `health`, just run. A paid one answers `402`, and the page pays it with your browser wallet (MetaMask, or any EIP-1193 wallet): it switches the wallet to Arc mainnet, asks you to sign the USDC authorization for the price shown, and resends the call. An MCP tool call on `POST /trade/v1/mcp` is paid the same way: when the tool answers with its price, the page signs it and resends the call with the payment inside.\n\n> [!CAUTION]\n> **Test Requests on paid operations cost real money.** Each one is a real x402 payment in USDC on Arc mainnet, at the prices above, from the wallet you connect. Your wallet shows the exact amount before you sign, and nothing is paid unless you sign. A single payment is never allowed above 5 USDC, the top swap fee, and errors are never charged.\n\n`swap` takes a `quoteId`, so run `quote` first and paste its id into the swap body. The `swap` answer is unsigned transactions for Arc mainnet: this page shows them, it never sends them.\n\nFrom your own code, use an x402 client as above, or the MCP server below.\n\nEvery error body has `next` beside `error`, saying what to do: `requote`, `retry` (after `retryAfterSec` when given), `fix_request`, `stop` or `pay`; a 200 that needs an action has one too.\n\nEvery response carries an `X-Request-Id` header. If a call goes wrong in a way you don't expect, send us that id with your report: it finds that exact call in our logs, including what the payment facilitator said about your payment.\n\n# MCP for agents\n\n`POST /trade/v1/mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server over Streamable HTTP. It is stateless: there's no session to open or keep, and every call is a single JSON-RPC `POST` (send `Accept: application/json, text/event-stream`).\n\n| Tool | What it does | USDC per call |\n| --- | --- | --- |\n| `tradeSearch` | Resolves a ticker, name or address to tokens | 0.005 |\n| `tradeQuote` | Prices a swap and returns a `quoteId` | 0.01 |\n| `tradeSwap` | Turns a `quoteId` into unsigned transactions | 0.01 to 5, by size |\n| `tradeVenues` | Lists venues, hubs and launchpads | free |\n| `health` | Reports service status | free |\n\nEach tool takes the same input as its operation on this page and costs the same. Payments are real USDC on Arc mainnet.\n\n**Paying inside MCP.** MCP has no HTTP headers, so x402 rides in the tool call itself. A paid tool called without payment answers `isError: true` with the price in `structuredContent`: the same requirements a `402` carries. An x402-aware client signs them and calls again with the payment in `params._meta[\"x402/payment\"]`, and the result carries the settlement receipt in `_meta[\"x402/payment-response\"]`. A result with `isError: true` is never charged. `@x402/mcp` runs that loop for you:\n\n```js\nimport { createx402MCPClient } from \"@x402/mcp\";\nimport { ExactEvmScheme } from \"@x402/evm/exact/client\";\nimport { StreamableHTTPClientTransport } from\n  \"@modelcontextprotocol/sdk/client/streamableHttp.js\";\nimport { privateKeyToAccount } from \"viem/accounts\";\n\n// Holds USDC on Arc mainnet: fees are real.\nconst signer =\n  privateKeyToAccount(process.env.PRIVATE_KEY);\n// The address you picked from tradeSearch.\nconst TOKEN = \"0x…\";\n\nconst FEE_NETWORK = \"eip155:5042\";\nconst USDC =\n  \"0x3600000000000000000000000000000000000000\";\n\nconst client = createx402MCPClient({\n  name: \"my-agent\",\n  version: \"1.0.0\",\n  schemes: [{\n    network: FEE_NETWORK,\n    client: new ExactEvmScheme(signer),\n  }],\n  // Allow Arc USDC, capped per payment at the top\n  // swap fee (5 USDC).\n  spendControls: {\n    allowedAssets: [{\n      network: FEE_NETWORK,\n      asset: USDC,\n      maxAmountPerPayment: \"5000000\",\n    }],\n  },\n});\nconst url = new URL(\n  `${process.env.API_URL}/trade/v1/mcp`);\nawait client.connect(\n  new StreamableHTTPClientTransport(url));\n// A tool's answer is JSON in its text content.\nconst body = (result) =>\n  JSON.parse(result.content[0].text);\n\n// Paid tools pay on their own; free ones never do.\nconst quote = await client.callTool(\"tradeQuote\", {\n  sell: USDC, buy: TOKEN, amount: \"100\",\n});\nif (quote.isError) {\n  throw new Error(JSON.stringify(quote.content));\n}\n// quote.paymentResponse is the settlement receipt.\nconst { quoteId } = body(quote);\n\nconst swap = await client.callTool(\"tradeSwap\", {\n  quoteId, taker: signer.address, approval: \"approve\",\n});\n// body(swap).transactions: unsigned, in order. Read\n// what you sign, then sign and send.\n```\n\nA generic MCP host (Claude Desktop, Cursor and the like) can connect and call the free tools. Its paid calls come back with the price, because paying takes an x402-aware client like the one above.\n\n# Agent skill\n\n`arcgate-trade` is an [Agent Skill](https://agentskills.io) that teaches an agent to take a plain-English order (\"buy 100 USDC of X\", \"sell my MOLLY\") through search, quote and swap: settling the trade's direction, resolving tickers to addresses, reading the safety verdict, and handing the user's wallet the transactions to sign. It includes a script that makes the paid calls with a wallet key, capped per payment.\n\n**Claude Code:**\n\n```bash\n/plugin marketplace add arcgate-dev/docs\n/plugin install arcgate-trade@arcgate\n```\n\n**Any other agent:** load [`/plugin/skills/arcgate-trade/SKILL.md`](/plugin/skills/arcgate-trade/SKILL.md) from this site; the script is in the same folder.\n\nPaid calls need an agent that can run code and a wallet key in `PRIVATE_KEY`, holding USDC on Arc. The fees are real. An agent that can't run code can still plan the trade and make the free calls."
+    "description": "arcgate is a checkpoint between your agent and the DEXes on Arc. It finds the token you meant, the venues that can actually fill it, and whether the trade is safe, then prices it and hands back unsigned transactions. **It never holds funds and never signs.** Your wallet does both.\n\n# A checkpoint, not a DEX\n\nThree paid calls, in this order, then your wallet takes over, and a free receipt tells you whether it landed.\n\n<ol>\n<li><code>search</code><strong>Right token.</strong><span>Every contract with the name you asked for, ranked, with impostors flagged by identity. Pick the address you meant.</span></li>\n<li><code>quote</code><strong>Right venue, safe to trade, best price.</strong><span>Only pools that exist and hold liquidity at this block. A simulated buy and sell-back from a fresh wallet. Prices at parity with KyberSwap. Returns a quoteId that is good for 120 seconds. Name your <code>taker</code> and it also says whether that wallet can finish the trade, and what finishing costs (<code>readiness</code>).</span></li>\n<li><code>swap</code><strong>Unsigned transactions.</strong><span>The quoteId and your taker address become the transactions to send, any approvals first, then the swap, re-simulated from your wallet first, and executed through arcgate's own ArcgateRouter contract. Approvals your allowance already covers are skipped, and a route funded entirely by native USDC needs no approval or signature at all. With the default Permit2 approval you may otherwise get a permit to sign; the response carries `signatures[]` (typed data) and `next: \"sign_permit\"`. After signing the permit, the next step is `POST /trade/v1/swap/tx`.</span></li>\n<li><code>swap/tx</code><strong>Free, for signed permits.</strong><span>FREE, never payment-gated. Turns a signed Permit2 permit into the final swap transactions. Body: `{ quoteId, taker, recipient? (defaults to taker), deadlineSec?, permit: { message, signature } }`. Permit required; no `approval` field. Returns the same 200 body as a swap answer with no pending signature. Only works right after a paid /swap for the same quote, taker and recipient that asked for a permit, and only once. Otherwise 409 `no_pending_swap` (next: `fix_request`). An expired quote answers 410 `quote_expired`, without a fresh quote.</span></li>\n<li><code>sign</code><strong>Your wallet signs.</strong><span>And broadcasts. arcgate never does.</span></li>\n<li><code>receipt</code><strong>Did it land?</strong><span>Free. Send the quoteId and your transaction hashes; get back what you received against minAmountOut, and pass or fail.</span></li>\n</ol>\n\n# Paying arcgate from your own code\n\n`search`, `quote` and `swap` are paid per call with [x402](https://x402.org) v2, in USDC on Arc. No API keys, no accounts.\n\n1. Call the endpoint with no payment. The answer is `402 Payment Required`, with the requirements (scheme, network, amount, asset, `payTo`, timeout) base64-encoded in the `PAYMENT-REQUIRED` header.\n2. Sign an EIP-3009 authorization for that amount and retry the **same** request with the signed payload, base64-encoded, in `PAYMENT-SIGNATURE`.\n3. A paid response carries the settlement receipt in `PAYMENT-RESPONSE`.\n\nAny x402 client runs that loop for you. Fees are paid in **real USDC on Arc mainnet**, the same chain the trade runs on. Arc USDC isn't one of x402's built-in assets (the standard client libraries ship USDC for Base only), so the client must allow it explicitly, or every payment is refused before it's signed. In JavaScript, that's `spendControls.allowedAssets` with network `eip155:5042`, asset `0x3600000000000000000000000000000000000000` and a per-payment maximum, as in the example below. Install once:\n\n```bash\nnpm install @x402/fetch @x402/core @x402/evm viem\n# Python: pip install \"x402[evm,requests]\"\n```\n\nThe example follows the language picked under **Client Libraries**. Its first call is one paid `search` (0.005 USDC), which proves the setup; the calls after it are the whole trade:\n\n```js\nimport { wrapFetchWithPayment } from \"@x402/fetch\";\nimport { x402Client } from \"@x402/core/client\";\nimport { ExactEvmScheme } from \"@x402/evm/exact/client\";\nimport { privateKeyToAccount } from \"viem/accounts\";\n\n// The server shown on this page.\nconst API = process.env.API_URL;\n// Holds USDC on Arc mainnet: fees are real.\nconst signer =\n  privateKeyToAccount(process.env.PRIVATE_KEY);\n// The address you picked from search.\nconst TOKEN = \"0x…\";\n\n// Fees are paid on Arc mainnet. (A local dev stack\n// charges on Arc testnet: \"eip155:5042002\".)\nconst FEE_NETWORK = \"eip155:5042\";\nconst USDC =\n  \"0x3600000000000000000000000000000000000000\";\n\nconst x402 = x402Client.fromConfig({\n  schemes: [{\n    network: FEE_NETWORK,\n    client: new ExactEvmScheme(signer),\n  }],\n  // Allow Arc USDC, capped per payment at the top\n  // swap fee (5 USDC).\n  spendControls: {\n    allowedAssets: [{\n      network: FEE_NETWORK,\n      asset: USDC,\n      maxAmountPerPayment: \"5000000\",\n    }],\n  },\n});\nconst pay = wrapFetchWithPayment(fetch, x402);\n\nasync function call(path, body) {\n  const res = await pay(`${API}/trade/v1/${path}`, {\n    method: \"POST\",\n    headers: { \"content-type\": \"application/json\" },\n    body: JSON.stringify(body),\n  });\n  const json = await res.json();\n  // Errors are never charged.\n  if (!res.ok) {\n    const code = json.error?.code;\n    throw new Error(`${path}: ${res.status} ${code}`);\n  }\n  return json;\n}\n\n// 0.005 USDC: the first paid call. If this returns\n// results, Arc USDC is allowed and the wallet pays.\nconst found = await call(\"search\", { query: \"USDC\" });\n\n// 0.01 USDC: route, round-trip loss, 120 second\n// expiry. Sells 100 USDC.\nconst quote = await call(\"quote\", {\n  sell: USDC, buy: TOKEN, amount: \"100\",\n});\n\n// 0.01 to 5 USDC by size. approval \"approve\" is\n// always one call: at most one exact-amount ERC-20\n// approve(ArcgateRouter, amountIn), no Permit2, no\n// signature. The default, \"permit2\", can return a\n// permit to sign. Then POST /trade/v1/swap/tx (free)\n// with the signed permit turns it into transactions.\nconst swap = await call(\"swap\", {\n  quoteId: quote.quoteId,\n  taker: signer.address,\n  approval: \"approve\",\n});\n\n// swap.transactions: approvals still needed, then\n// the swap, all unsigned. Read what you sign. Your\n// wallet signs and sends each one, in order.\n```\n\n```python\n# pip install \"x402[evm,requests]\"\nimport os\nfrom eth_account import Account\nfrom x402 import (\n    SchemeRegistration,\n    x402ClientConfig,\n    x402ClientSync,\n)\nfrom x402.http.clients import x402_requests\nfrom x402.mechanisms.evm.exact import (\n    ExactEvmClientScheme)\n\n# The server shown on this page.\nAPI = os.environ[\"API_URL\"]\n# Holds USDC on Arc mainnet: fees are real.\naccount = Account.from_key(os.environ[\"PRIVATE_KEY\"])\n# The address you picked from search.\nTOKEN = \"0x…\"\n\n# Fees are paid on Arc mainnet. (A local dev stack\n# charges on Arc testnet: \"eip155:5042002\".)\nFEE_NETWORK = \"eip155:5042\"\nUSDC = \"0x3600000000000000000000000000000000000000\"\n\nx402 = x402ClientSync.from_config(x402ClientConfig(\n    schemes=[SchemeRegistration(\n        network=FEE_NETWORK,\n        client=ExactEvmClientScheme(account),\n    )],\n    # Allow Arc USDC, capped per payment at the top\n    # swap fee (5 USDC).\n    spend_controls={\"allowed_assets\": [{\n        \"network\": FEE_NETWORK,\n        \"asset\": USDC,\n        \"max_amount_per_payment\": \"5000000\",\n    }]},\n))\nsession = x402_requests(x402)\n\ndef call(path, body):\n    url = f\"{API}/trade/v1/{path}\"\n    res = session.post(url, json=body)\n    data = res.json()\n    # Errors are never charged.\n    if not res.ok:\n        code = data[\"error\"][\"code\"]\n        raise RuntimeError(\n            f\"{path}: {res.status_code} {code}\")\n    return data\n\n# 0.005 USDC: the first paid call. If this returns\n# results, Arc USDC is allowed and the wallet pays.\nfound = call(\"search\", {\"query\": \"USDC\"})\n\n# 0.01 USDC: route, round-trip loss, 120 second\n# expiry. Sells 100 USDC.\nquote = call(\"quote\", {\n    \"sell\": USDC, \"buy\": TOKEN, \"amount\": \"100\",\n})\n\n# 0.01 to 5 USDC by size. approval \"approve\" is\n# always one call: at most one exact-amount approve,\n# no Permit2, no signature.\nswap = call(\"swap\", {\n    \"quoteId\": quote[\"quoteId\"],\n    \"taker\": account.address,\n    \"approval\": \"approve\",\n})\n\n# swap[\"transactions\"]: approvals still needed, then\n# the swap, all unsigned. Read what you sign. Your\n# wallet signs and sends each one, in order.\n```\n\n```bash\n# Free calls work from curl as they are.\ncurl \"$API_URL/trade/v1/venues\"\ncurl \"$API_URL/health\"\n\n# A paid call answers 402, with its price in\n# PAYMENT-REQUIRED (base64 JSON).\nUSDC=0x3600000000000000000000000000000000000000\nTOKEN=0x…   # the address you picked from search\nBODY=\"{\\\"sell\\\":\\\"$USDC\\\",\\\"buy\\\":\\\"$TOKEN\\\",\"\nBODY+=\"\\\"amount\\\":\\\"100\\\"}\"\ncurl -s -D - -o /dev/null \\\n  -X POST \"$API_URL/trade/v1/quote\" \\\n  -H 'content-type: application/json' -d \"$BODY\" \\\n  | grep -i '^payment-required' | cut -d' ' -f2 \\\n  | tr -d '\\r' | base64 -d\n\n# curl can't sign the EIP-3009 payment for the\n# retry. Pay with the JavaScript or Python client\n# (pick it under Client Libraries), or connect over\n# MCP below.\n```\n\n# Prices\n\n| Operation | USDC per call |\n| --- | --- |\n| `search` | 0.005 |\n| `quote` | 0.01 |\n| `swap` under 1k | 0.01 |\n| `swap` 1k to 10k | 0.05 |\n| `swap` over 10k | 0.05 + 0.5 bps above 10k, capped at 5 |\n| `swap/tx`, `venues`, `health`, `openapi`, `receipt` | free |\n\nErrors are never charged. A `cannot_sell` safety verdict on a quote is an answer, so it is charged. `insufficient_liquidity` (`422`) and an expired quote (`410`) are free. Nothing is taken from your swap output. `swap` is paid once per quote. When it requests a signature, `swap/tx` turns the signed permit into the transactions, free.\n\n# Calling the API\n\nEvery operation has a **Test Request** button that calls the API from this page. Free operations, `venues` and `health`, just run. A paid one answers `402`, and the page pays it with your browser wallet (MetaMask, or any EIP-1193 wallet): it switches the wallet to Arc mainnet, asks you to sign the USDC authorization for the price shown, and resends the call. An MCP tool call on `POST /trade/v1/mcp` is paid the same way: when the tool answers with its price, the page signs it and resends the call with the payment inside.\n\n> [!CAUTION]\n> **Test Requests on paid operations cost real money.** Each one is a real x402 payment in USDC on Arc mainnet, at the prices above, from the wallet you connect. Your wallet shows the exact amount before you sign, and nothing is paid unless you sign. A single payment is never allowed above 5 USDC, the top swap fee, and errors are never charged.\n\n`swap` takes a `quoteId`, so run `quote` first and paste its id into the swap body. The `swap` answer is unsigned transactions for Arc mainnet: this page shows them, it never sends them.\n\nFrom your own code, use an x402 client as above, or the MCP server below.\n\nEvery error body has `next` beside `error`, saying what to do: `requote`, `retry` (after `retryAfterSec` when given), `fix_request`, `stop` or `pay`; a 200 that needs an action has one too.\n\nEvery response carries an `X-Request-Id` header. If a call goes wrong in a way you don't expect, send us that id with your report: it finds that exact call in our logs, including what the payment facilitator said about your payment.\n\n# MCP for agents\n\n`POST /trade/v1/mcp` is a [Model Context Protocol](https://modelcontextprotocol.io) server over Streamable HTTP. It is stateless: there's no session to open or keep, and every call is a single JSON-RPC `POST` (send `Accept: application/json, text/event-stream`).\n\n| Tool | What it does | USDC per call |\n| --- | --- | --- |\n| `tradeSearch` | Resolves a ticker, name or address to tokens | 0.005 |\n| `tradeQuote` | Prices a swap and returns a `quoteId` | 0.01 |\n| `tradeSwap` | Turns a `quoteId` into unsigned transactions | 0.01 to 5, by size |\n| `tradeSwapTx` | Turns a signed Permit2 permit into final swap transactions | free |\n| `tradeVenues` | Lists venues, hubs and launchpads | free |\n| `health` | Reports service status | free |\n\nEach tool takes the same input as its operation on this page and costs the same. Payments are real USDC on Arc mainnet.\n\n**Paying inside MCP.** MCP has no HTTP headers, so x402 rides in the tool call itself. A paid tool called without payment answers `isError: true` with the price in `structuredContent`: the same requirements a `402` carries. An x402-aware client signs them and calls again with the payment in `params._meta[\"x402/payment\"]`, and the result carries the settlement receipt in `_meta[\"x402/payment-response\"]`. A result with `isError: true` is never charged. `@x402/mcp` runs that loop for you:\n\n```js\nimport { createx402MCPClient } from \"@x402/mcp\";\nimport { ExactEvmScheme } from \"@x402/evm/exact/client\";\nimport { StreamableHTTPClientTransport } from\n  \"@modelcontextprotocol/sdk/client/streamableHttp.js\";\nimport { privateKeyToAccount } from \"viem/accounts\";\n\n// Holds USDC on Arc mainnet: fees are real.\nconst signer =\n  privateKeyToAccount(process.env.PRIVATE_KEY);\n// The address you picked from tradeSearch.\nconst TOKEN = \"0x…\";\n\nconst FEE_NETWORK = \"eip155:5042\";\nconst USDC =\n  \"0x3600000000000000000000000000000000000000\";\n\nconst client = createx402MCPClient({\n  name: \"my-agent\",\n  version: \"1.0.0\",\n  schemes: [{\n    network: FEE_NETWORK,\n    client: new ExactEvmScheme(signer),\n  }],\n  // Allow Arc USDC, capped per payment at the top\n  // swap fee (5 USDC).\n  spendControls: {\n    allowedAssets: [{\n      network: FEE_NETWORK,\n      asset: USDC,\n      maxAmountPerPayment: \"5000000\",\n    }],\n  },\n});\nconst url = new URL(\n  `${process.env.API_URL}/trade/v1/mcp`);\nawait client.connect(\n  new StreamableHTTPClientTransport(url));\n// A tool's answer is JSON in its text content.\nconst body = (result) =>\n  JSON.parse(result.content[0].text);\n\n// Paid tools pay on their own; free ones never do.\nconst quote = await client.callTool(\"tradeQuote\", {\n  sell: USDC, buy: TOKEN, amount: \"100\",\n});\nif (quote.isError) {\n  throw new Error(JSON.stringify(quote.content));\n}\n// quote.paymentResponse is the settlement receipt.\nconst { quoteId } = body(quote);\n\nconst swap = await client.callTool(\"tradeSwap\", {\n  quoteId, taker: signer.address, approval: \"approve\",\n});\n// body(swap).transactions: unsigned, in order. Read\n// what you sign, then sign and send.\n```\n\nA generic MCP host (Claude Desktop, Cursor and the like) can connect and call the free tools. Its paid calls come back with the price, because paying takes an x402-aware client like the one above.\n\n# Agent skill\n\n`arcgate-trade` is an [Agent Skill](https://agentskills.io) that teaches an agent to take a plain-English order (\"buy 100 USDC of X\", \"sell my MOLLY\") through search, quote and swap: settling the trade's direction, resolving tickers to addresses, reading the safety verdict, and handing the user's wallet the transactions to sign. It includes a script that makes the paid calls with a wallet key, capped per payment.\n\n**Claude Code:**\n\n```bash\n/plugin marketplace add arcgate-dev/docs\n/plugin install arcgate-trade@arcgate\n```\n\n**Any other agent:** load [`/plugin/skills/arcgate-trade/SKILL.md`](/plugin/skills/arcgate-trade/SKILL.md) from this site; the script is in the same folder.\n\nPaid calls need an agent that can run code and a wallet key in `PRIVATE_KEY`, holding USDC on Arc. The fees are real. An agent that can't run code can still plan the trade and make the free calls."
   },
   "servers": [
     {
@@ -1958,7 +1958,7 @@
           "trade"
         ],
         "summary": "Turn a stored quote into unsigned swap transactions",
-        "description": "Turns a stored quote into unsigned transactions for the taker to sign and send. arcgate never signs, broadcasts or holds funds.\n\n- **Cost:** 0.01 USDC under $1,000; 0.05 USDC from $1,000 to $10,000; above that 0.05 USDC plus 0.5 bps of the amount over $10,000, capped at 5 USDC, size-tiered by the quote's USD notional (the USDC side for a USDC pair, or a token-to-token quote's USD valuation; a quote with no valuation prices at tier 1), over x402 (402 with `PAYMENT-REQUIRED`, retry with `PAYMENT-SIGNATURE`). Charged once per quote: the Permit2 round 2 below is free.\n- **Key inputs:** `quoteId` (from POST /trade/v1/quote), `taker`; optional `recipient` (defaults to `taker`), `deadlineSec`, `approval`, `permit`.\n- **Every quote executes through ArcgateRouter:** it is always the Permit2 `spender` and the ERC-20 `approve` spender below. When every source pool of the route being executed trades native USDC, the swap is funded by `value` instead - no approval transaction and no signature at all.\n- **Permit2 (default, one or two calls):**\n  - **Round 1** (no `permit`): returns `transactions` - an unlimited ERC-20 `approve(Permit2, type(uint256).max)` first, if the token's ERC-20 allowance to Permit2 is below the amount, then the swap, which carries an empty Permit2 signature and is only directly sendable as-is when a Permit2 allowance to ArcgateRouter already covers the amount, in which case `signatures` is empty too. Otherwise it also returns `signatures: [{ kind: \"permit2\", typedData }]`; sign `typedData` with the taker's key (EIP-712, e.g. viem's `signTypedData`).\n  - **Round 2** (call again with the same `quoteId`, `taker` and `recipient`, and `permit: { message: typedData.message, signature }`, while the quote is live): free, because round 1 paid the swap fee. The first round 2 that succeeds uses it up; a failed one doesn't. `permit` accepts only `message` and `signature`, end to end - any other field, at any level, is 400 `invalid_request` at parse. The service rebuilds the Permit2 domain itself and checks the signer, spender, token, amount, nonce and both deadlines: a mismatched spender or token, or an amount below `amountIn` (a larger amount is accepted), is 400 `invalid_request`; a stale nonce, an expired `sigDeadline`/`expiration`, or an invalid signature (verified via ERC-1271 on chain for a contract taker) is 422 `swap_reverts`.\n  - A valid permit is embedded in the swap, and the on-chain deadline is clamped to `min(now + deadlineSec, sigDeadline, expiration)`.\n  - Send that response's `transactions` in order.\n- **`approval: \"approve\"` (one call):** returns at most one ERC-20 `approve(ArcgateRouter, amountIn)` transaction instead of a permit to sign - an exact amount, never Permit2, never a signature - and only when the taker's current allowance is below it. Combining `permit` with `approval: \"approve\"` is 400 `invalid_request`.\n- **Freshness:** the quote lives for the `ttlSec` the quote call asked for (default/max 120s); after that `quoteId` is 410 `quote_expired`. Every call re-quotes and re-simulates at the current block and returns 409 `quote_stale` when the fresh re-quote fails or falls below the stored `minAmountOut`, when the pre-flight simulation reverts on slippage, or when the simulated delivery is below `minAmountOut`. A 409 or 410 carries a free fresh quote in `quote`, with `next: \"requote\"`: the original quote request (same amount, tokens, side, `slippageBps` and venues, default `ttlSec`) quoted again through the same pipeline, exactly as POST /trade/v1/quote answers it; when the original named a `taker`, the fresh quote is for this call's `taker`, the wallet swapping now. Nothing executes on it: check its price, `safety.verdict` and `readiness`, then swap its `quoteId`. When the fresh quote can't be traded (`no_route`, `insufficient_liquidity`, `unsupported_venue` or `buy_reverts`, a `cannot_sell` or `illiquid` verdict, not executable, or the taker isn't ready) the answer is `next: \"stop\"` with no `quote`, and `error.hint` says why. One fresh quote per paid quote: a second 409/410 for the same `quoteId`, a quote that itself came from a 409/410, or a quote expired over 5 minutes ago gets plain `requote` with no `quote`, as does one whose re-quote couldn't run or failed on the server's side; then quote again yourself.\n- **Fallback:** A stored route on a disabled/undeployed venue falls back to the best executable candidate the quote already priced (warning `route_not_executable`), or 422 `not_executable` when no such candidate exists, none re-quotes, or no ArcgateRouter is configured at all.\n- **Next:** sign and send `transactions` in order, then confirm the fill with POST /trade/v1/receipt (free). This is the last paid call in search -> quote -> swap.",
+        "description": "Turns a stored quote into unsigned transactions for the taker to sign and send. arcgate never signs, broadcasts or holds funds.\n\n- **Cost:** 0.01 USDC under $1,000; 0.05 USDC from $1,000 to $10,000; above that 0.05 USDC plus 0.5 bps of the amount over $10,000, capped at 5 USDC, size-tiered by the quote's USD notional (the USDC side for a USDC pair, or a token-to-token quote's USD valuation; a quote with no valuation prices at tier 1), over x402 (402 with `PAYMENT-REQUIRED`, retry with `PAYMENT-SIGNATURE`). Charged once per quote: POST /trade/v1/swap/tx, the Permit2 second round below, is free.\n- **Key inputs:** `quoteId` (from POST /trade/v1/quote), `taker`; optional `recipient` (defaults to `taker`), `deadlineSec`, `approval`. Never `permit` - that belongs to POST /trade/v1/swap/tx; sending one here is 400 `invalid_request` (the strict schema rejects the unknown key).\n- **Every quote executes through ArcgateRouter:** it is always the Permit2 `spender` and the ERC-20 `approve` spender below. When every source pool of the route being executed trades native USDC, the swap is funded by `value` instead - no approval transaction and no signature at all.\n- **Permit2 (default, one or two calls):**\n  - Returns `transactions` - an unlimited ERC-20 `approve(Permit2, type(uint256).max)` first, if the token's ERC-20 allowance to Permit2 is below the amount, then the swap, which carries an empty Permit2 signature and is only directly sendable as-is when a Permit2 allowance to ArcgateRouter already covers the amount, in which case `signatures` is empty too. Otherwise it also returns `signatures: [{ kind: \"permit2\", typedData }]`; sign `typedData` with the taker's key (EIP-712, e.g. viem's `signTypedData`).\n  - **Sign, then call POST /trade/v1/swap/tx** with the same `quoteId`, `taker` and `recipient`, and `permit: { message: typedData.message, signature }`, while the quote is live: free, because this call already paid the swap fee. The first call to it that succeeds uses the round up; a failed one doesn't.\n  - Send that response's `transactions` in order.\n- **`approval: \"approve\"` (one call):** returns at most one ERC-20 `approve(ArcgateRouter, amountIn)` transaction instead of a permit to sign - an exact amount, never Permit2, never a signature - and only when the taker's current allowance is below it.\n- **Freshness:** the quote lives for the `ttlSec` the quote call asked for (default/max 120s); after that `quoteId` is 410 `quote_expired`. Every call re-quotes and re-simulates at the current block and returns 409 `quote_stale` when the fresh re-quote fails or falls below the stored `minAmountOut`, when the pre-flight simulation reverts on slippage, or when the simulated delivery is below `minAmountOut`. A 409 or 410 carries a free fresh quote in `quote`, with `next: \"requote\"`: the original quote request (same amount, tokens, side, `slippageBps` and venues, default `ttlSec`) quoted again through the same pipeline, exactly as POST /trade/v1/quote answers it; when the original named a `taker`, the fresh quote is for this call's `taker`, the wallet swapping now. Nothing executes on it: check its price, `safety.verdict` and `readiness`, then swap its `quoteId`. When the fresh quote can't be traded (`no_route`, `insufficient_liquidity`, `unsupported_venue` or `buy_reverts`, a `cannot_sell` or `illiquid` verdict, not executable, or the taker isn't ready) the answer is `next: \"stop\"` with no `quote`, and `error.hint` says why. One fresh quote per paid quote: a second 409/410 for the same `quoteId`, a quote that itself came from a 409/410, or a quote expired over 5 minutes ago gets plain `requote` with no `quote`, as does one whose re-quote couldn't run or failed on the server's side; then quote again yourself.\n- **Fallback:** A stored route on a disabled/undeployed venue falls back to the best executable candidate the quote already priced (warning `route_not_executable`), or 422 `not_executable` when no such candidate exists, none re-quotes, or no ArcgateRouter is configured at all.\n- **Attempts:** a quote gets at most 5 failed calls here; the next call on that `quoteId` is 429 `swap_attempts_exhausted` (`next: \"requote\"`), answered without running the swap pipeline. A failed call is a 409, a 410 (its fresh quote may run), a 422, 500 or 503; a 200, a 404, or a 400 (at parse, or a reserved `taker`/`recipient`) uses none. POST /trade/v1/swap/tx counts its own, per permit round.\n- **Next:** a 200 with `signatures` non-empty needs POST /trade/v1/swap/tx before sending anything (`next: \"sign_permit\"`); otherwise sign and send `transactions` in order, then confirm the fill with POST /trade/v1/receipt (free).",
         "security": [
           {
             "x402": []
@@ -2004,8 +2004,8 @@
                 "$ref": "#/components/schemas/SwapRequest"
               },
               "examples": {
-                "first round, no permit": {
-                  "summary": "first round, no permit",
+                "swap": {
+                  "summary": "swap",
                   "value": {
                     "quoteId": "q_d02d694103c1e1f2",
                     "taker": "0x93595C7Ac4E7E5afe5232D614041B48a6111687B"
@@ -2017,15 +2017,15 @@
         },
         "responses": {
           "200": {
-            "description": "Unsigned transactions. On a first call (no `permit`) that needs a signature, `signatures[0].typedData` is the Permit2 `PermitSingle` to sign; `transactions` includes the swap with an empty Permit2 signature, not yet embedded. When no signature is needed (native-USDC-funded, or an existing Permit2 allowance already covers the amount), `signatures` is empty and `transactions` is directly sendable. `warnings[]` may include `route_not_executable` (fallback route; a truly non-executable route is 422 instead). `approval_fallback` is reserved in the schema for contract stability but is never emitted.",
+            "description": "Unsigned transactions. When a signature is needed, `signatures[0].typedData` is the Permit2 `PermitSingle` to sign (`next: \"sign_permit\"`); `transactions` includes the swap with an empty Permit2 signature, not yet embedded - sign, then call POST /trade/v1/swap/tx. When no signature is needed (native-USDC-funded, or an existing Permit2 allowance already covers the amount), `signatures` is empty and `transactions` is directly sendable. `warnings[]` may include `route_not_executable` (fallback route; a truly non-executable route is 422 instead). `approval_fallback` is reserved in the schema for contract stability but is never emitted.",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SwapResponse"
                 },
                 "examples": {
-                  "first round": {
-                    "summary": "first round",
+                  "swap": {
+                    "summary": "swap",
                     "value": {
                       "quoteId": "q_d02d694103c1e1f2",
                       "block": 23393292,
@@ -3524,6 +3524,21 @@
               }
             }
           },
+          "429": {
+            "description": "swap_attempts_exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwapErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
           "500": {
             "description": "internal (arcgate's own handler) or an x402 middleware internal error - neither settles payment.",
             "content": {
@@ -3567,6 +3582,191 @@
         }
       }
     },
+    "/trade/v1/swap/tx": {
+      "post": {
+        "operationId": "tradeSwapTx",
+        "tags": [
+          "trade"
+        ],
+        "summary": "Sign and send the Permit2 permit a paid POST /trade/v1/swap asked for",
+        "description": "The free Permit2 second round: finishes a POST /trade/v1/swap call whose `signatures` asked the taker to sign a Permit2 `PermitSingle`.\n\n- **Cost:** free, never x402-gated - a payment header, if one is sent anyway, is ignored and nobody is charged. Only reachable once, right after the paid call that opened it.\n- **Key inputs:** the SAME `quoteId`, `taker` and `recipient` (defaults to `taker`) as the paid POST /trade/v1/swap call, plus `deadlineSec` and the required `permit: { message: signatures[0].typedData.message, signature }` (sign `typedData` with the taker's key, EIP-712, e.g. viem's `signTypedData`). `permit` accepts only `message` and `signature`, end to end - any other field, at any level, is 400 `invalid_request` at parse. The service rebuilds the Permit2 domain itself and checks the signer, spender, token, amount, nonce and both deadlines: a mismatched spender or token, or an amount below `amountIn` (a larger amount is accepted), is 400 `invalid_request`; a stale nonce, an expired `sigDeadline`/`expiration`, or an invalid signature (verified via ERC-1271 on chain for a contract taker) is 422 `swap_reverts`. A contract taker can swap, but POST /trade/v1/receipt only reads transactions the taker sends itself, so it answers `invalid_request` for a Safe, ERC-4337 or batching EIP-7702 wallet: check your own transaction receipt instead.\n- **No pending round:** 409 `no_pending_swap` when this `quoteId`/`taker`/`recipient` never paid, named a different taker or recipient, or already used its one free call - call POST /trade/v1/swap first, which is paid and returns the permit this call takes.\n- **Freshness:** re-quotes and re-simulates exactly like POST /trade/v1/swap, and can answer the SAME 410 `quote_expired`/409 `quote_stale` it would - but never with a fresh `quote` (issue #124's free re-quote is /trade/v1/swap's own paid-quote courtesy, not this free route's).\n- **Attempts:** a permit round (`quoteId`, `taker`, `recipient`) gets at most 5 failed calls; the next one is 429 `swap_attempts_exhausted` (`next: \"requote\"`), answered without running the swap pipeline. A failed call is a 400 from the permit checks above, a 409, 422, 500 or 503; a 200, a 400 at parse, a 404, a 410 or `no_pending_swap` uses none. Failed POST /trade/v1/swap calls don't count here.\n- **Next:** sign and send `transactions` in order, then confirm the fill with POST /trade/v1/receipt (free). This is the last call in search -> quote -> swap -> swap/tx.",
+        "security": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SwapTxRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Unsigned, directly sendable transactions with the permit embedded.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwapResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "400": {
+            "description": "invalid_request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwapErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "404": {
+            "description": "quote_not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwapErrorResponse"
+                },
+                "examples": {
+                  "quote_not_found": {
+                    "summary": "quote_not_found",
+                    "value": {
+                      "error": {
+                        "code": "quote_not_found",
+                        "message": "no quote with that id"
+                      },
+                      "next": "requote"
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "409": {
+            "description": "quote_stale / no_pending_swap",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwapErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "410": {
+            "description": "quote_expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwapErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "413": {
+            "description": "payload_too_large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "422": {
+            "description": "insufficient_balance / swap_reverts / cannot_sell / not_executable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwapErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "429": {
+            "description": "swap_attempts_exhausted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwapErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "description": "internal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwapErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "503": {
+            "description": "rpc_unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SwapErrorResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        }
+      }
+    },
     "/trade/v1/receipt": {
       "post": {
         "operationId": "tradeReceipt",
@@ -3574,7 +3774,7 @@
           "trade"
         ],
         "summary": "Confirm a swap landed: delivered against minAmountOut, pass or fail",
-        "description": "Tells you whether the transactions POST /trade/v1/swap returned did what the quote promised, once you've sent them. It only reads the chain.\n\n- **Cost:** free, never x402-gated.\n- **Key inputs:** `quoteId` (the one you called POST /trade/v1/swap with) and `txHashes`, the 1 to 4 transactions you sent for it: the swap, and any approvals. It answers for a quote /trade/v1/swap handed transactions for in the last hour, else 404 `swap_not_found`, and only for that quote's transactions, sent from its `taker`: an approval to the input token, or a swap to ArcgateRouter whose deadline one of the quote's /trade/v1/swap answers issued and whose output goes to its `recipient`, else 400 `invalid_request`.\n- **Returns:** `result`, from the swap transactions. One that filled decides it: `pass` when `delivered` is at least `minAmountOut`, else `fail` (a round 1 that reverted doesn't undo a round 2 that filled). With none filled: `pending` while one is not mined yet, else `fail`: it reverted or was never mined by 60s after its deadline (status `expired`, or `not_found` when the chain never saw it). Approvals are listed but don't change the result. `delivered` is what `recipient` received of `token` (the output), read from the swap transaction's Transfer logs, in base units. Also `block`, each transaction's `status`, and `reason`, one sentence on a fail or pending. The first result from a mined swap is final: asking again returns it.\n- **Limits:** one chain read per quote every 5s (the same `txHashes` inside that get the last answer; other hashes get 429 `receipt_rate_limited` with `retryAfterSec`), and at most 132 per quote (then 429 `receipt_reads_exhausted`, for good).\n- **Next:** `pass`: tell the user what they bought (`delivered` of `token`). `fail`: follow `next`: `requote` when no swap transaction succeeded (nothing filled; quote again), `stop` when one did (tell them `reason`, and don't trade again). `pending`: ask again in a few seconds.",
+        "description": "Tells you whether the transactions POST /trade/v1/swap returned did what the quote promised, once you've sent them. It only reads the chain.\n\n- **Cost:** free, never x402-gated.\n- **Key inputs:** `quoteId` (the one you called POST /trade/v1/swap with) and `txHashes`, the 1 to 4 transactions you sent for it: the swap, and any approvals. It answers for a quote /trade/v1/swap handed transactions for in the last hour, else 404 `swap_not_found`, and only for that quote's transactions, sent from its `taker`: an approval to the input token, or a swap to ArcgateRouter whose deadline one of the quote's /trade/v1/swap or /trade/v1/swap/tx answers issued and whose output goes to its `recipient`, else 400 `invalid_request`.\n- **Smart-contract wallets:** a Safe, an ERC-4337 account or a batching EIP-7702 wallet sends its transaction from an executor or bundler, or to itself, not from the taker to ArcgateRouter, so this answers 400 `invalid_request` for it. Check that transaction's own receipt and your wallet's success event instead.\n- **Returns:** `result`, from the swap transactions. One that filled decides it: `pass` when `delivered` is at least `minAmountOut`, else `fail` (a round 1 that reverted doesn't undo a round 2 that filled). With none filled: `pending` while one is not mined yet, else `fail`: it reverted or was never mined by 60s after its deadline (status `expired`, or `not_found` when the chain never saw it). Approvals are listed but don't change the result. `delivered` is what `recipient` received of `token` (the output), read from the swap transaction's Transfer logs, in base units. Also `block`, each transaction's `status`, and `reason`, one sentence on a fail or pending. The first result from a mined swap is final: asking again returns it.\n- **Limits:** one chain read per quote every 5s (the same `txHashes` inside that get the last answer; other hashes get 429 `receipt_rate_limited` with `retryAfterSec`), and at most 132 per quote (then 429 `receipt_reads_exhausted`, for good).\n- **Next:** `pass`: tell the user what they bought (`delivered` of `token`). `fail`: follow `next`: `requote` when no swap transaction succeeded (nothing filled; quote again), `stop` when one did (tell them `reason`, and don't trade again). `pending`: ask again in a few seconds.",
         "security": [],
         "requestBody": {
           "required": true,
@@ -3970,7 +4170,7 @@
           "trade"
         ],
         "summary": "Model Context Protocol endpoint (paid tools over x402)",
-        "description": "The trade API as MCP tools, paid per call with x402.\n\n- **Tools:** every other operation here except `openapi`, named by operationId (tradeSearch, tradeQuote, tradeSwap, tradeReceipt, tradeVenues, health), with the same input schema and the same price.\n- **Cost:** tradeSearch, tradeQuote and tradeSwap are paid per call over Arc USDC; tradeReceipt, tradeVenues and health are free. An unpaid `tools/call` returns a tool result with `isError: true` and the payment requirements in `structuredContent`. Sign them and retry with the payment payload in `params._meta[\"x402/payment\"]`; the receipt comes back in `result._meta[\"x402/payment-response\"]`. A result with `isError: true` never settles.\n- **Errors:** two error results are @x402/mcp's own and carry no `next`: that payment-required one, and a text-only `Internal Server Error` when the facilitator fails mid-call. Every other error result carries the HTTP route's error body, `next` included, in `structuredContent` and the text content; a call the server refuses (an unknown tool, or arguments the input schema rejects) is `invalid_request`, `next: fix_request`.\n- **Client:** use an x402-aware MCP client, e.g. `createx402MCPClient` from `@x402/mcp`.\n- **Transport:** Streamable HTTP, stateless, JSON responses. Send `Accept: application/json, text/event-stream` or the server answers 406. One JSON-RPC message per request (batches are rejected); bodies up to 16kb.",
+        "description": "The trade API as MCP tools, paid per call with x402.\n\n- **Tools:** every other operation here except `openapi`, named by operationId (tradeSearch, tradeQuote, tradeSwap, tradeSwapTx, tradeReceipt, tradeVenues, health), with the same input schema and the same price.\n- **Cost:** tradeSearch, tradeQuote and tradeSwap are paid per call over Arc USDC; tradeSwapTx, tradeReceipt, tradeVenues and health are free. An unpaid `tools/call` returns a tool result with `isError: true` and the payment requirements in `structuredContent`. Sign them and retry with the payment payload in `params._meta[\"x402/payment\"]`; the receipt comes back in `result._meta[\"x402/payment-response\"]`. A result with `isError: true` never settles.\n- **Errors:** two error results are @x402/mcp's own and carry no `next`: that payment-required one, and a text-only `Internal Server Error` when the facilitator fails mid-call. Every other error result carries the HTTP route's error body, `next` included, in `structuredContent` and the text content; a call the server refuses (an unknown tool, or arguments the input schema rejects) is `invalid_request`, `next: fix_request`.\n- **Client:** use an x402-aware MCP client, e.g. `createx402MCPClient` from `@x402/mcp`.\n- **Transport:** Streamable HTTP, stateless, JSON responses. Send `Accept: application/json, text/event-stream` or the server answers 406. One JSON-RPC message per request (batches are rejected); bodies up to 16kb.",
         "security": [],
         "parameters": [
           {
@@ -4680,6 +4880,42 @@
               "permit2",
               "approve"
             ]
+          }
+        },
+        "required": [
+          "quoteId",
+          "taker"
+        ],
+        "additionalProperties": false
+      },
+      "SwapTxRequest": {
+        "type": "object",
+        "properties": {
+          "quoteId": {
+            "type": "string",
+            "pattern": "^q_[0-9a-f]{16,}$"
+          },
+          "taker": {
+            "type": "string",
+            "pattern": "^0x[0-9a-fA-F]{40}$"
+          },
+          "recipient": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^0x[0-9a-fA-F]{40}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "deadlineSec": {
+            "default": 60,
+            "type": "integer",
+            "minimum": 10,
+            "maximum": 600
           },
           "permit": {
             "type": "object",
@@ -4745,7 +4981,8 @@
         },
         "required": [
           "quoteId",
-          "taker"
+          "taker",
+          "permit"
         ],
         "additionalProperties": false
       },
@@ -5784,7 +6021,7 @@
             "additionalProperties": false
           },
           "next": {
-            "description": "What to do next. requote: get a new quote, then swap its quoteId. retry: send the same request again, after retryAfterSec when given. fix_request: the request itself is wrong; change it first. stop: don't retry; tell the user. pay: pay the 402 and send the same request again. sign_permit: sign signatures[0].typedData and call POST /trade/v1/swap again with `permit`.",
+            "description": "What to do next. requote: get a new quote, then swap its quoteId. retry: send the same request again, after retryAfterSec when given. fix_request: the request itself is wrong; change it first. stop: don't retry; tell the user. pay: pay the 402 and send the same request again. sign_permit: sign signatures[0].typedData and call POST /trade/v1/swap/tx with `permit`.",
             "type": "string",
             "enum": [
               "requote",
@@ -6888,7 +7125,7 @@
             "type": "object",
             "properties": {
               "swapUsdc": {
-                "description": "The POST /trade/v1/swap price for this quote; 0 when payment is off. This quote is already paid; the Permit2 round is free.",
+                "description": "The POST /trade/v1/swap price for this quote; 0 when payment is off. This quote is already paid; POST /trade/v1/swap/tx, which takes the signed permit, is free.",
                 "type": "string",
                 "pattern": "^\\d+(\\.\\d+)?$"
               },
@@ -7052,7 +7289,7 @@
             "$ref": "#/components/schemas/QuoteReadinessOut"
           },
           "next": {
-            "description": "What to do next. requote: get a new quote, then swap its quoteId. retry: send the same request again, after retryAfterSec when given. fix_request: the request itself is wrong; change it first. stop: don't retry; tell the user. pay: pay the 402 and send the same request again. sign_permit: sign signatures[0].typedData and call POST /trade/v1/swap again with `permit`.",
+            "description": "What to do next. requote: get a new quote, then swap its quoteId. retry: send the same request again, after retryAfterSec when given. fix_request: the request itself is wrong; change it first. stop: don't retry; tell the user. pay: pay the 402 and send the same request again. sign_permit: sign signatures[0].typedData and call POST /trade/v1/swap/tx with `permit`.",
             "type": "string",
             "enum": [
               "requote",
@@ -7166,7 +7403,7 @@
             "additionalProperties": false
           },
           "next": {
-            "description": "What to do next. requote: get a new quote, then swap its quoteId. retry: send the same request again, after retryAfterSec when given. fix_request: the request itself is wrong; change it first. stop: don't retry; tell the user. pay: pay the 402 and send the same request again. sign_permit: sign signatures[0].typedData and call POST /trade/v1/swap again with `permit`.",
+            "description": "What to do next. requote: get a new quote, then swap its quoteId. retry: send the same request again, after retryAfterSec when given. fix_request: the request itself is wrong; change it first. stop: don't retry; tell the user. pay: pay the 402 and send the same request again. sign_permit: sign signatures[0].typedData and call POST /trade/v1/swap/tx with `permit`.",
             "type": "string",
             "enum": [
               "requote",
@@ -7481,7 +7718,7 @@
             }
           },
           "next": {
-            "description": "What to do next. requote: get a new quote, then swap its quoteId. retry: send the same request again, after retryAfterSec when given. fix_request: the request itself is wrong; change it first. stop: don't retry; tell the user. pay: pay the 402 and send the same request again. sign_permit: sign signatures[0].typedData and call POST /trade/v1/swap again with `permit`.",
+            "description": "What to do next. requote: get a new quote, then swap its quoteId. retry: send the same request again, after retryAfterSec when given. fix_request: the request itself is wrong; change it first. stop: don't retry; tell the user. pay: pay the 402 and send the same request again. sign_permit: sign signatures[0].typedData and call POST /trade/v1/swap/tx with `permit`.",
             "type": "string",
             "enum": [
               "requote",
@@ -7521,10 +7758,12 @@
                   "quote_not_found",
                   "quote_stale",
                   "quote_expired",
+                  "no_pending_swap",
                   "insufficient_balance",
                   "swap_reverts",
                   "cannot_sell",
                   "not_executable",
+                  "swap_attempts_exhausted",
                   "internal",
                   "rpc_unavailable"
                 ]
@@ -7546,7 +7785,7 @@
             "additionalProperties": false
           },
           "next": {
-            "description": "What to do next. requote: get a new quote, then swap its quoteId. retry: send the same request again, after retryAfterSec when given. fix_request: the request itself is wrong; change it first. stop: don't retry; tell the user. pay: pay the 402 and send the same request again. sign_permit: sign signatures[0].typedData and call POST /trade/v1/swap again with `permit`.",
+            "description": "What to do next. requote: get a new quote, then swap its quoteId. retry: send the same request again, after retryAfterSec when given. fix_request: the request itself is wrong; change it first. stop: don't retry; tell the user. pay: pay the 402 and send the same request again. sign_permit: sign signatures[0].typedData and call POST /trade/v1/swap/tx with `permit`.",
             "type": "string",
             "enum": [
               "requote",
@@ -7757,7 +7996,7 @@
             "additionalProperties": false
           },
           "next": {
-            "description": "What to do next. requote: get a new quote, then swap its quoteId. retry: send the same request again, after retryAfterSec when given. fix_request: the request itself is wrong; change it first. stop: don't retry; tell the user. pay: pay the 402 and send the same request again. sign_permit: sign signatures[0].typedData and call POST /trade/v1/swap again with `permit`.",
+            "description": "What to do next. requote: get a new quote, then swap its quoteId. retry: send the same request again, after retryAfterSec when given. fix_request: the request itself is wrong; change it first. stop: don't retry; tell the user. pay: pay the 402 and send the same request again. sign_permit: sign signatures[0].typedData and call POST /trade/v1/swap/tx with `permit`.",
             "type": "string",
             "enum": [
               "requote",
@@ -7926,7 +8165,7 @@
             "additionalProperties": false
           },
           "next": {
-            "description": "What to do next. requote: get a new quote, then swap its quoteId. retry: send the same request again, after retryAfterSec when given. fix_request: the request itself is wrong; change it first. stop: don't retry; tell the user. pay: pay the 402 and send the same request again. sign_permit: sign signatures[0].typedData and call POST /trade/v1/swap again with `permit`.",
+            "description": "What to do next. requote: get a new quote, then swap its quoteId. retry: send the same request again, after retryAfterSec when given. fix_request: the request itself is wrong; change it first. stop: don't retry; tell the user. pay: pay the 402 and send the same request again. sign_permit: sign signatures[0].typedData and call POST /trade/v1/swap/tx with `permit`.",
             "type": "string",
             "enum": [
               "requote",
