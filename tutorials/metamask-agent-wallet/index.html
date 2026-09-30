@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Trade through arcgate with MetaMask Agent Wallet · arcgate docs</title>
+    <meta name="description" content="Connect MetaMask Agent Wallet 7.0.0 to api.arcgate.dev, pay x402, sign Permit2, and trade on Arc mainnet, with the trade sent in MetaMask&#39;s Beast Mode." />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#EEF1EB" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#101815" media="(prefers-color-scheme: dark)" />
+    <link rel="canonical" href="https://docs.arcgate.dev/tutorials/metamask-agent-wallet/" />
+
+    <link rel="icon" href="../../favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="../../favicon.png" type="image/png" sizes="32x32" />
+    <link rel="apple-touch-icon" href="../../apple-touch-icon.png" />
+
+    <link rel="preload" href="../../fonts/schibsted-grotesk-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="../../fonts/schibsted-grotesk-latin-600-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="preload" href="../../fonts/martian-mono-latin-wdth-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="../../theme.css" />
+    <link rel="stylesheet" href="../../tutorials.css" />
+    <script>
+      (function () {
+        var root = document.documentElement;
+        var stored = null;
+        try { stored = localStorage.getItem("colorMode"); } catch (e) {}
+        var dark = stored === "dark" || (stored !== "light" && matchMedia("(prefers-color-scheme: dark)").matches);
+        if (dark) root.classList.add("ag-dark");
+      })();
+    </script>
+  </head>
+  <body>
+    <a class="ag-skip" href="#ag-tut-article">Skip to the article</a>
+    <header class="ag-header">
+      <a class="ag-mark" href="https://arcgate.dev/" aria-label="arcgate.dev home">
+        <span class="ag-word">arc</span><span class="ag-gatebar" aria-hidden="true"></span><span class="ag-word">gate</span><span class="ag-suffix">docs</span>
+      </a>
+      <nav class="ag-nav" aria-label="arcgate">
+        <a class="ag-hide-sm" href="../../#arcgate/description/prices">Pricing</a>
+        <a class="ag-hide-sm" href="https://arcgate.dev/">arcgate.dev</a>
+        <a class="ag-current" href="../../tutorials/" aria-current="page">Tutorials</a>
+        <a href="../../">API reference</a>
+        <button type="button" class="ag-mode-toggle" data-ag-mode-toggle aria-label="Toggle dark mode"><span data-ag-mode-label>Dark</span></button>
+      </nav>
+    </header>
+    <main id="ag-tut-article" class="ag-tut-main">
+      <div class="ag-tut-grid">
+        <header class="ag-tut-prose ag-tut-head">
+          <h1 id="ag-tut-title">Trade through arcgate with MetaMask Agent Wallet</h1>
+          <p class="ag-tut-description">Connect MetaMask Agent Wallet 7.0.0 to api.arcgate.dev, pay x402, sign Permit2, and trade on Arc mainnet, with the trade sent in MetaMask&#39;s Beast Mode.</p>
+          <p class="ag-tut-wallet">MetaMask Agent Wallet</p>
+          
+        </header>
+        <nav class="ag-tut-toc" aria-label="On this page">
+    <details class="ag-tut-toc-mobile" open>
+      <summary>On this page</summary>
+      <ol><li><a href="#before-you-start">Before you start</a></li>
+<li><a href="#install-the-tutorial-and-metamask-skills">1. Install the tutorial and MetaMask skills</a></li>
+<li><a href="#connect-and-fund-your-wallet">2. Connect and fund your wallet</a></li>
+<li><a href="#understand-the-two-trading-modes">3. Understand the two trading modes</a></li>
+<li><a href="#pay-for-a-search">4. Pay for a search</a></li>
+<li><a href="#get-a-quote">5. Get a quote</a></li>
+<li><a href="#inspect-the-swap-with-mm-decode">6. Inspect the swap with `mm decode`</a></li>
+<li><a href="#sign-permit2-and-send-through-metamask">7. Sign Permit2 and send through MetaMask</a></li>
+<li><a href="#troubleshooting">Troubleshooting</a></li>
+<li><a href="#tests-and-verification">Tests and verification</a></li></ol>
+    </details>
+  </nav>
+        <article class="ag-tut-prose ag-tut-body" aria-labelledby="ag-tut-title">
+          <p>Use <strong>MetaMask Agent Wallet 7.0.0</strong>, its <code>mm</code> CLI, and <a href="https://github.com/MetaMask/agent-skills">MetaMask&#39;s skills for Claude Code</a> to call <strong><a href="https://api.arcgate.dev">https://api.arcgate.dev</a></strong>. You will pay for API calls with x402, search for cirBTC, quote <strong>0.50 USDC</strong>, inspect the swap, sign its Permit2 permit, and send the transactions through MetaMask.</p>
+<p>The complete runnable example is in the public <a href="https://github.com/arcgate-dev/tutorials/tree/main/arc-metamask">arcgate-dev/tutorials repository</a>. Dependencies are public npm packages; wallet keys and MetaMask login credentials stay in <code>mm</code>. Arcgate needs no API key. Both API payments and the swap use <strong>Arc mainnet, chain <code>5042</code></strong>.</p>
+<p><strong>Guard Mode doesn&#39;t work for this swap on Arc yet, so the trade step runs in Beast Mode.</strong> MetaMask&#39;s Guard Mode refuses the router transaction with <code>Policy evaluator ... degraded: unavailable</code>: its outflow and token-recipient checks need a transaction simulation that MetaMask can&#39;t run for this call on Arc. This is a MetaMask-side limitation; no policy change works around it. Beast Mode skips those two checks and keeps MetaMask&#39;s threat scanning. On September 30, 2026 the trade completed on Arc mainnet in Beast Mode (<a href="https://explorer.arc.io/tx/0x5629fced0a8514384079109b269e8811c8ad90f97de9014b58c2ee2a02ef844b">swap</a>, Arcgate <code>/receipt</code> <code>pass</code>). Payments, search, quote, preview, Permit2 signing and decoding worked in both modes, and the one-time USDC approval was sent in Guard Mode on September 29. See <a href="https://github.com/arcgate-dev/tutorials/blob/main/arc-metamask/VALIDATION.md">VALIDATION.md</a>.</p>
+<h2 id="before-you-start">Before you start</h2>
+<ul>
+<li>Node.js <strong>22.18 or newer</strong>, npm, Git, and Claude Code. The optional chain-list filter uses <code>jq</code>.</li>
+<li><code>@metamask/agent-wallet@7.0.0</code> and the MetaMask Agent Wallet skill.</li>
+<li>A <strong>dedicated</strong> MetaMask <strong>server wallet</strong>, funded with only a few USDC on Arc mainnet. You will switch it to Beast Mode for the trade and back to Guard Mode afterward. Bring-your-own-key (<code>byok</code>) uses a different custody and policy model and isn&#39;t covered here.</li>
+</ul>
+<p>This walkthrough spends real funds. The application limits each API payment to <strong>0.01 USDC</strong>, each command to <strong>0.025 USDC in API fees</strong>, and each trade to <strong>at most 1 USDC</strong>. The configured order is <strong>0.50 USDC</strong>. Gas costs extra, in USDC. About 2 USDC gives headroom for the example, though gas varies.</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>What it does</th>
+<th>API fees at current prices</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>npm run inspect</code></td>
+<td>Checks the service and an unpaid 402 response</td>
+<td>Free</td>
+</tr>
+<tr>
+<td><code>npm run connect</code></td>
+<td>Checks <code>mm</code>, networks, wallet mode, policy and balance</td>
+<td>Free</td>
+</tr>
+<tr>
+<td><code>npm run policy</code></td>
+<td>Saves a policy proposal for your review</td>
+<td>Free; applies nothing</td>
+</tr>
+<tr>
+<td><code>npm run search</code></td>
+<td>Resolves cirBTC</td>
+<td>0.005 USDC</td>
+</tr>
+<tr>
+<td><code>npm run quote</code></td>
+<td>Searches, then quotes</td>
+<td>0.015 USDC total</td>
+</tr>
+<tr>
+<td><code>npm run preview</code></td>
+<td>Searches, quotes, builds and decodes the first swap response</td>
+<td>0.025 USDC total</td>
+</tr>
+<tr>
+<td><code>npm run trade -- --execute --beast</code></td>
+<td>Runs the Permit2 flow, broadcasts and confirms with <code>/receipt</code> (wallet in Beast Mode)</td>
+<td>0.025 USDC, plus the trade and gas</td>
+</tr>
+<tr>
+<td><code>npm run receipt -- &lt;quoteId&gt; &lt;txHash&gt;...</code></td>
+<td>Asks Arcgate whether a sent swap delivered its minimum</td>
+<td>Free</td>
+</tr>
+</tbody></table>
+<p>Every wallet command expects the wallet in Guard Mode unless you add <code>--beast</code>; it then expects Beast Mode. It checks the mode with MetaMask&#39;s server and never changes it. Each command starts a fresh run. Running all four paid commands costs <strong>0.07 USDC</strong> in API fees. Preview pays its API fees even though it sends no transactions.</p>
+<p>There are <strong>two different allowances</strong> in the Permit2 flow: the API returns an unlimited ERC-20 approval from USDC to the fixed Permit2 contract; the signed Permit2 permit grants ArcgateRouter only the exact sell amount, with a 30-day allowance expiry and a short signature deadline. The ERC-20 approval can remain after trading. Use a dedicated wallet and review both permissions.</p>
+<h2 id="install-the-tutorial-and-metamask-skills" class="ag-tut-step-heading"><span class="ag-tut-step-badge" aria-hidden="true">1</span><span class="ag-tut-step-text">Install the tutorial and MetaMask skills</span></h2>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>git clone https://github.com/arcgate-dev/tutorials.git
+cd tutorials/arc-metamask
+npm ci
+cp .env.example .env
+npm install -g @metamask/agent-wallet@7.0.0
+claude plugin marketplace add MetaMask/agent-skills
+claude plugin install metamask-agent-wallet@metamask
+mm --version</code></pre></div></figure>
+<p>Start a new Claude Code session to load the skill. The plugin supplies wallet guidance; the CLI is installed separately. These instructions were checked against <a href="https://github.com/MetaMask/agent-skills/tree/9909fa472b52032dd3bb4995a807e524c36c71b2">agent-skills commit <code>9909fa4</code></a>, which targets CLI 7.0.0.</p>
+<p>Run the npm commands from <strong><code>tutorials/arc-metamask</code></strong>. Only this folder&#39;s <code>.env</code> is loaded:</p>
+<figure class="ag-tut-code" data-lang="dotenv"><div class="ag-tut-code-caption ag-tut-code-lang"><span>dotenv</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>API_URL=https://api.arcgate.dev
+ARC_RPC_URL=https://rpc.mainnet.arc.io
+ARCGATE_PAY_TO=0x08A4f8734ADAB08d3461E356b5A498b893Bd7B5e
+ARCGATE_ROUTER_ADDRESS=0x6cf4f7785d479b9ec1c3abe2fb569525380baede
+SELL_AMOUNT=0.50</code></pre></div></figure>
+<p>No wallet secret belongs in this file. <code>ARCGATE_PAY_TO</code> is Arcgate&#39;s fee recipient, not your wallet. Addresses are pinned locally so a server response cannot silently replace them. <code>ARC_RPC_URL</code> is used for readbacks and receipts; it does <strong>not</strong> change where <code>mm</code> broadcasts.</p>
+<p>You can inspect the public API before connecting a wallet:</p>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>npm run inspect</code></pre></div></figure>
+<p>The unpaid <code>POST /trade/v1/search</code> must return HTTP <strong>402</strong>, with x402 v2 requirements for <code>exact</code>, <code>eip155:5042</code>, the USDC contract <code>0x3600000000000000000000000000000000000000</code>, and the configured fee recipient. Search costs <code>5000</code> atomic USDC units, or 0.005 USDC.</p>
+<h2 id="connect-and-fund-your-wallet" class="ag-tut-step-heading"><span class="ag-tut-step-badge" aria-hidden="true">2</span><span class="ag-tut-step-text">Connect and fund your wallet</span></h2>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>mm doctor --json</code></pre></div></figure>
+<p>If unauthenticated, run <code>mm login</code> and finish its login flow. If uninitialized, choose the wallet mode this tutorial assumes:</p>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>mm init --wallet server-wallet --mode guard
+mm doctor --json
+mm init show --json
+mm wallet address --json</code></pre></div></figure>
+<p>Do not reinitialize an existing wallet to follow a tutorial. Check its mode first. This walkthrough requires <code>walletMode: &quot;server-wallet&quot;</code>. Start in Guard Mode; step 7 switches to Beast Mode only for the trade. In BYOK mode, <code>mm wallet policy get</code> returns <code>WRONG_WALLET_MODE</code>.</p>
+<p>Send USDC to the printed address on <strong>Arc mainnet (5042)</strong>, then:</p>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>npm run connect</code></pre></div></figure>
+<p>This reads the selected wallet, policy and USDC balance. It signs nothing and pays nothing. Use your own address; no Circle account or Arcgate server is needed.</p>
+<p>Confirm both Arc entries:</p>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>mm chains list --json | jq &#39;.data.chains[] | select(.key == &quot;arc&quot; or .key == &quot;arc-testnet&quot;)&#39;</code></pre></div></figure>
+<table>
+<thead>
+<tr>
+<th>CLI key</th>
+<th>Chain ID</th>
+<th>Role here</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>arc</code></td>
+<td><code>5042</code></td>
+<td>API payments, Permit2 signature, approval and swap</td>
+</tr>
+<tr>
+<td><code>arc-testnet</code></td>
+<td><code>5042002</code></td>
+<td>Availability check only; testnet funds cannot pay this API</td>
+</tr>
+</tbody></table>
+<p><code>mm</code> uses numeric IDs in <code>--chain-id</code>. Arc is gated server-side by <strong>NetworkRegistry</strong>: local chain constants do not establish service support. Stop if the expected entries are absent. <code>relaySupported: false</code> is a relay capability flag, not proof that ordinary wallet signing or broadcasting is unavailable. Chain listing also does not prove policy acceptance.</p>
+<h2 id="understand-the-two-trading-modes" class="ag-tut-step-heading"><span class="ag-tut-step-badge" aria-hidden="true">3</span><span class="ag-tut-step-text">Understand the two trading modes</span></h2>
+<p>A MetaMask server wallet runs in one of two trading modes. The mode applies to the whole wallet, not to one command:</p>
+<table>
+<thead>
+<tr>
+<th>Guardrail</th>
+<th>Guard Mode</th>
+<th>Beast Mode</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Threat scanning (Blockaid; covered on Arc)</td>
+<td>✓</td>
+<td>✓</td>
+</tr>
+<tr>
+<td>Network allowlist</td>
+<td>✓</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Address and token-recipient allowlists</td>
+<td>✓</td>
+<td>No</td>
+</tr>
+<tr>
+<td>Rolling 24-hour USD outflow limit</td>
+<td>✓</td>
+<td>No</td>
+</tr>
+</tbody></table>
+<p><strong>On Arc, Guard Mode can&#39;t send this swap.</strong> Its outflow limit and token-recipient allowlist are computed by simulating the transaction, and MetaMask reports that simulation as unavailable for the ArcgateRouter call. The transaction is refused with <code>TX_FAILED: Policy evaluator outflow.limit_usd degraded: unavailable</code> (or <code>whitelist.token_recipient</code> with no USD limit). Removing the USD limit and allowlisting every address involved both failed. The same transaction succeeds with a direct <code>eth_call</code> on Arc, and it broadcasts and fills in Beast Mode. The plain USDC <code>approve</code> passed in Guard Mode. Beast Mode skips the checks that refused the swap, so it shouldn&#39;t refuse the approval either, but a fresh wallet&#39;s approve-then-swap sequence has only been run in Guard (where the swap was refused), not end to end in Beast. <a href="https://github.com/arcgate-dev/tutorials/blob/main/arc-metamask/VALIDATION.md">VALIDATION.md</a> has the full record.</p>
+<p>So this tutorial runs searches, quotes and the preview in <strong>Guard Mode</strong>, and switches to <strong>Beast Mode</strong> only to send the trade. What you give up in Beast Mode is MetaMask&#39;s own limit and allowlists. This application checks the same things for its own transactions before it signs anything:</p>
+<ul>
+<li>each API payment is capped at 0.01 USDC and each run at 0.025 USDC, paid only to the pinned fee recipient on chain 5042;</li>
+<li>the order is capped at 1 USDC and pinned to the cirBTC contract;</li>
+<li>every transaction is decoded with a bundled ABI, and its destination (the pinned ArcgateRouter or USDC), input amount, output token, recipient (your wallet), output floor and deadline must match the quote;</li>
+<li>the Permit2 permit must name ArcgateRouter, the exact sell amount and short deadlines;</li>
+<li>delivery is checked on chain and with Arcgate&#39;s <code>/receipt</code>.</li>
+</ul>
+<p>Those checks cover what this application sends. They don&#39;t restrict anything else that can use the wallet while it is in Beast Mode. That&#39;s why you should use a dedicated wallet with only a few USDC, and switch back to Guard as soon as the trade is done.</p>
+<h3 id="allow-arc-in-the-guard-policy">Allow Arc in the Guard policy</h3>
+<p>Guard Mode only considers requests on chains in the wallet&#39;s policy, and a new wallet&#39;s policy doesn&#39;t include Arc. Add it before the paid commands:</p>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>npm run policy</code></pre></div></figure>
+<p>This saves the current policy, MetaMask&#39;s template and a proposal under <code>.runs/policy-…/</code>. The proposal adds chain <code>5042</code>, raises <code>rolling_24h</code> to at least $2, and adds this tutorial&#39;s addresses only if your allowlist is already nonempty. It never removes a restriction. It <strong>applies nothing</strong>; compare <code>proposed.yaml</code> with <code>before.yaml</code>, then apply it with the path it printed:</p>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>mm wallet policy set --policy &quot;$(cat .runs/policy-REPLACE_WITH_PRINTED_ID/proposed.yaml)&quot; --no-wait --json
+mm wallet policy get --json
+npm run connect</code></pre></div></figure>
+<p>Adding a chain or raising a limit requires <strong>MetaMask MFA</strong>; follow the notice, then reread the policy. A <code>pending_approval</code> answer is not a rejection; don&#39;t submit a duplicate. <code>npm run connect</code> prints <code>problems: []</code> once the policy is ready. When MetaMask&#39;s Arc simulation works, <code>npm run trade -- --execute</code> without <code>--beast</code> will use this policy and refuse to start until that review passes.</p>
+<h2 id="pay-for-a-search" class="ag-tut-step-heading"><span class="ag-tut-step-badge" aria-hidden="true">4</span><span class="ag-tut-step-text">Pay for a search</span></h2>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>npm run search</code></pre></div></figure>
+<p>The request is <code>POST https://api.arcgate.dev/trade/v1/search</code> with:</p>
+<figure class="ag-tut-code" data-lang="json"><div class="ag-tut-code-caption ag-tut-code-lang"><span>json</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>{&quot;query&quot;:&quot;cirBTC&quot;,&quot;limit&quot;:5}</code></pre></div></figure>
+<p><a href="https://github.com/arcgate-dev/tutorials/blob/main/arc-metamask/src/payment.js">src/payment.js</a> reads the 402 offer, checks the chain, USDC contract, recipient, amount and expiry, and asks the x402 SDK to create an <strong>EIP-3009 <code>TransferWithAuthorization</code></strong>. Its signer calls:</p>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>mm wallet sign-typed-data --chain-id 5042 --payload &#39;&lt;complete EIP-712 JSON&gt;&#39; --wait --wallet-timeout 60 --json</code></pre></div></figure>
+<p>The <a href="https://github.com/arcgate-dev/tutorials/blob/main/arc-metamask/src/metamask.js">CLI adapter</a> passes argument arrays without a shell. It verifies <code>SIGNED</code> and recovers the signature to your selected wallet. The x402 client explicitly allows Arc USDC through <code>spendControls.allowedAssets</code>, retries the identical HTTP request once with <code>PAYMENT-SIGNATURE</code>, and checks the settlement in <code>PAYMENT-RESPONSE</code>.</p>
+<p>A repeated 402 or lost paid response stops the run. The client reserves its budget before signing and does not free it after a timeout. It never signs another payment automatically for the same call.</p>
+<p>The search must resolve to the verified, unflagged cirBTC contract:</p>
+<figure class="ag-tut-code" data-lang="text"><div class="ag-tut-code-caption ag-tut-code-lang"><span>text</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>0x171a4217b86a807a64eb94757db6849fb4bdbaa0</code></pre></div></figure>
+<p>Ambiguous results, a different contract, an unverified token or flags stop the flow.</p>
+<h2 id="get-a-quote" class="ag-tut-step-heading"><span class="ag-tut-step-badge" aria-hidden="true">5</span><span class="ag-tut-step-text">Get a quote</span></h2>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>npm run quote</code></pre></div></figure>
+<p>After searching, <a href="https://github.com/arcgate-dev/tutorials/blob/main/arc-metamask/src/flow.js">src/flow.js</a> pays for <code>POST /trade/v1/quote</code>:</p>
+<figure class="ag-tut-code" data-lang="json"><div class="ag-tut-code-caption ag-tut-code-lang"><span>json</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>{
+  &quot;sell&quot;: &quot;0x3600000000000000000000000000000000000000&quot;,
+  &quot;buy&quot;: &quot;0x171a4217b86a807a64eb94757db6849fb4bdbaa0&quot;,
+  &quot;amount&quot;: &quot;0.50&quot;,
+  &quot;side&quot;: &quot;exactIn&quot;,
+  &quot;venues&quot;: [&quot;uniswap_v3&quot;],
+  &quot;slippageBps&quot;: 100
+}</code></pre></div></figure>
+<p><code>amount</code> is in human-readable USDC, and 100 basis points is 1% slippage. The input is returned as <code>sell.amount</code> / <code>sell.amountRaw</code>; the output quote and floor are <code>best.amountOutQuoted</code> and <code>best.minAmountOut</code>, in cirBTC units.</p>
+<p>The tutorial chooses Uniswap v3 to demonstrate ERC-20 input and Permit2. A native-funded route would skip the permit. Quotes normally live 120 seconds. Only safety verdicts <code>ok</code> and <code>pinned</code> are accepted, and the original quote&#39;s output floor is retained for all later checks.</p>
+<h2 id="inspect-the-swap-with-mm-decode" class="ag-tut-step-heading"><span class="ag-tut-step-badge" aria-hidden="true">6</span><span class="ag-tut-step-text">Inspect the swap with <code>mm decode</code></span></h2>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>npm run preview</code></pre></div></figure>
+<p>This obtains a fresh search and quote, then requests:</p>
+<figure class="ag-tut-code" data-lang="js"><div class="ag-tut-code-caption ag-tut-code-lang"><span>js</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>const request = {
+  quoteId: quote.quoteId,
+  taker: wallet.address,
+  recipient: wallet.address,
+  approval: &#39;permit2&#39;,
+  deadlineSec: 300,
+};
+const first = await api(&#39;swap&#39;, request);</code></pre></div></figure>
+<p>For a fresh Permit2 allowance, the response contains a <code>PermitSingle</code> signing request and a placeholder swap transaction. If needed, it also contains a USDC approval to Permit2. <strong>Never broadcast the placeholder swap.</strong> A funded wallet is required even for preview because <code>/swap</code> simulates the order.</p>
+<p>Before any submission, <a href="https://github.com/arcgate-dev/tutorials/blob/main/arc-metamask/src/guards.js">src/guards.js</a> decodes the entire batch using the included ERC-20 and ArcgateRouter ABIs. It verifies destinations, approval spender, tokens, exact input, recipient, original minimum output, deadline, zero native value and Permit2 pull mode. Then the adapter calls <code>mm decode</code> on <strong>both the approval and swap calldata</strong>:</p>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>mm decode --payload &#39;&lt;swap transaction data&gt;&#39; --json</code></pre></div></figure>
+<p>During the mainnet check, <code>mm decode</code> recognized both <code>approve</code> and <code>executeGraph</code>. The 7.0.0 decoder uses a public selector database, which may return <code>Call unknown function</code> for <code>executeGraph</code> (<code>0xfdbcb692</code>). The example prints that result alongside the independent, bundled-ABI review. An unknown selector alone is never permission to send: failed ABI decoding or mismatched order fields stop the run. A conflicting function name also stops it.</p>
+<p>The checked permit must use Permit2 on chain 5042, authorize only ArcgateRouter, spend exactly the configured USDC amount, and have bounded expiry and signature deadlines. Preview displays the permit but <strong>does not sign it or send transactions</strong>. Its x402 payment signatures still spend API fees.</p>
+<p>These guards check the order and its permissions; they do not independently price the token or audit every nested venue call. Review the output floor and decoded route targets.</p>
+<h2 id="sign-permit2-and-send-through-metamask" class="ag-tut-step-heading"><span class="ag-tut-step-badge" aria-hidden="true">7</span><span class="ag-tut-step-text">Sign Permit2 and send through MetaMask</span></h2>
+<p>Review the preview&#39;s order, floor, permit and route first. Then switch the wallet to Beast Mode. MetaMask asks you to confirm by email (or MetaMask Mobile); wait for the server to report <code>beast</code>:</p>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>mm wallet trading-mode set beast --no-wait --json
+mm wallet trading-mode get --json</code></pre></div></figure>
+<p>Run the trade:</p>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>npm run trade -- --execute --beast</code></pre></div></figure>
+<p>Then switch back. Tightening to Guard applies immediately, without MFA:</p>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>mm wallet trading-mode set guard --no-wait --json
+mm wallet trading-mode get --json</code></pre></div></figure>
+<p>With <code>--beast</code>, the run requires the server to report <code>beast</code> before it starts and before every signature and transaction, and stops if the mode changed. It never changes the mode itself. Beast Mode doesn&#39;t enforce the policy YAML, so the local policy review is skipped.</p>
+<p>The executing flow gets a fresh quote and first swap response, repeats the checks, and:</p>
+<ol>
+<li>Signs <code>first.signatures[0].typedData</code> with <strong><code>mm wallet sign-typed-data --chain-id 5042</code></strong>, verifying the recovered signer.</li>
+<li>Sends any USDC approval with <strong><code>mm wallet send-transaction</code></strong> and waits for a successful onchain receipt.</li>
+<li>Calls <strong><code>/trade/v1/swap/tx</code></strong> with the same <code>quoteId</code>, <code>taker</code>, <code>recipient</code> and <code>deadlineSec</code>, plus <code>permit: { message: typedData.message, signature }</code>. This second round is <strong>free</strong>: the paid <code>/swap</code> call already covered it. It takes no <code>approval</code> field; the API rejects unknown keys.</li>
+<li>Decodes the returned swap again with <code>mm decode</code> and the bundled ABI. It requires no outstanding signature request and checks that the embedded permit and signature exactly match what the wallet signed.</li>
+<li>Sends the final swap with <code>mm wallet send-transaction</code>, checks the receipt, and verifies cirBTC delivery against the original minimum and Transfer logs.</li>
+<li>Asks the free <strong><code>/trade/v1/receipt</code></strong> with the <code>quoteId</code> and every hash it sent. It requires <code>pass</code> and the same <code>delivered</code> amount the local check measured. A <code>pending</code> answer is asked again every 6 seconds, up to four times; after that, run the printed <code>npm run receipt -- ...</code> command yourself. Never rerun the trade to check it.</li>
+</ol>
+<p>The adapter sends only transaction fields:</p>
+<figure class="ag-tut-code" data-lang="js"><div class="ag-tut-code-caption ag-tut-code-lang"><span>js</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>const payload = {
+  to: tx.to,
+  data: tx.data,
+  value: numberToHex(BigInt(tx.value)),
+  gas: numberToHex(BigInt(tx.gas)),
+};</code></pre></div></figure>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>mm wallet send-transaction --chain-id 5042 --payload &#39;&lt;payload JSON&gt;&#39; --wait --wallet-timeout 60 --json</code></pre></div></figure>
+<p>The API&#39;s <code>value</code> and <code>gas</code> are decimal integer strings; the CLI expects hex quantities. The Permit2 route uses <code>value: &quot;0x0&quot;</code>. Native Arc USDC transaction values use 18 decimals, while ERC-20 USDC amounts use 6.</p>
+<p><code>BROADCASTED</code> or <code>CONFIRMED</code> plus a hash establish submission, not successful delivery. The script waits for receipts and compares the cirBTC balance increase with both Transfer logs and the original quote floor.</p>
+<p>If MFA takes longer than the quote lifetime, the run can stop after approval. Check the existing transaction before starting a new order. Logs under <code>.runs/</code> record payment hashes and MetaMask request IDs, without credentials or reusable signatures. Rerunning the whole trade creates a new order and may trade again.</p>
+<p>In Claude Code, give the agent the concrete scope: follow this tutorial, buy 0.50 USDC of the pinned cirBTC contract on Arc mainnet, use 1% slippage, cap each payment at 0.01 USDC and the executing command&#39;s API fees at 0.025 USDC. Preview in Guard Mode; for the trade, ask me to approve the switch to Beast Mode, run with <code>--beast</code>, and switch back to Guard right after. Review the permit, persistent Permit2 approval and decoded order before execution; handle MFA on the existing request.</p>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<table>
+<thead>
+<tr>
+<th>Result</th>
+<th>What to check</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>mm doctor</code> is not ready</td>
+<td>Complete login and initialization; rerun doctor before wallet commands.</td>
+</tr>
+<tr>
+<td>Missing <code>arc</code> or <code>arc-testnet</code> entry</td>
+<td>Resolve MetaMask NetworkRegistry/service support. A policy edit cannot enable an unsupported chain.</td>
+</tr>
+<tr>
+<td>Policy preflight refuses execution</td>
+<td>Only in Guard Mode. Inspect current policy, the proposal and service template. Confirm MFA completed and reread the applied policy.</td>
+</tr>
+<tr>
+<td><code>The wallet is in guard mode; this run expects beast</code> (or the reverse)</td>
+<td>The server&#39;s trading mode doesn&#39;t match the flag. After <code>trading-mode set beast</code>, approve the email and check <code>mm wallet trading-mode get</code> before retrying.</td>
+</tr>
+<tr>
+<td><code>Policy evaluator ... degraded: unavailable</code></td>
+<td>MetaMask could not complete a server-side policy check. This is not a pending MFA request. Guard Mode&#39;s outflow and token-recipient checks need a MetaMask-side simulation that is unavailable for this Arc router call; neither removing the USD ceiling nor an allowlist resolved it. Send the trade in Beast Mode (step 7). See <a href="https://github.com/arcgate-dev/tutorials/blob/main/arc-metamask/VALIDATION.md">VALIDATION.md</a>.</td>
+</tr>
+<tr>
+<td><code>AWAITING_MFA</code></td>
+<td>MetaMask is waiting for the wallet owner to approve this request through the email or Mobile prompt in its notice. For a signing/transaction job, use <code>mm wallet requests watch &lt;polling-id&gt;</code>. For policy changes, approve the notice and reread <code>policy get</code>; policy MFA IDs are not wallet-job IDs.</td>
+</tr>
+<tr>
+<td>Timeout while waiting</td>
+<td>The existing MetaMask request may still complete. Inspect that request before retrying. Do not submit a duplicate or automatically change wallet mode.</td>
+</tr>
+<tr>
+<td><code>HTTP 402</code> right after a payment was signed</td>
+<td>The payment facilitator refused the payment; nothing settled. It has intermittently answered <code>invalid_exact_evm_signature</code> for valid signatures. Rerun the command.</td>
+</tr>
+<tr>
+<td>Payment requirements differ</td>
+<td>Run <code>npm run inspect</code>; check the public configuration before changing pinned addresses or limits.</td>
+</tr>
+<tr>
+<td><code>/receipt</code> is <code>pending</code> or unavailable</td>
+<td>The swap already mined if the local delivery check passed. Wait at least 5 seconds and run the printed <code>npm run receipt -- &lt;quoteId&gt; &lt;hashes&gt;</code>; it is free. Do not rerun the trade.</td>
+</tr>
+<tr>
+<td><code>swap/tx</code> answers <code>409 no_pending_swap</code></td>
+<td>The free round needs the same <code>quoteId</code>, <code>taker</code> and <code>recipient</code> as a paid <code>/swap</code> call, and succeeds only once. Start a new quote.</td>
+</tr>
+<tr>
+<td>No fresh Permit2 request</td>
+<td>Existing allowance or native funding skipped signing. Use an appropriate dedicated wallet; do not claim a Permit2 signing test.</td>
+</tr>
+<tr>
+<td>HTTP 410 or <code>quote_stale</code></td>
+<td>The quote expired or changed. Inspect existing approvals, then obtain a fresh quote and review its floor.</td>
+</tr>
+<tr>
+<td>HTTP 422</td>
+<td>Read the error code; the order may lack liquidity or fail simulation.</td>
+</tr>
+<tr>
+<td>Unknown calldata</td>
+<td>The bundled exact ABI must decode successfully and pass every order check; unknown alone is not approval.</td>
+</tr>
+<tr>
+<td>Shield or recipient refusal</td>
+<td>Review the reported contract/recipient and route. Policy YAML cannot disable these service checks.</td>
+</tr>
+<tr>
+<td>Reverted receipt or delivery mismatch</td>
+<td>Stop and inspect receipts. API fees and gas are separate from the failed trade.</td>
+</tr>
+</tbody></table>
+<h2 id="tests-and-verification">Tests and verification</h2>
+<figure class="ag-tut-code" data-lang="sh"><div class="ag-tut-code-caption ag-tut-code-lang"><span>sh</span><button type="button" class="ag-tut-copy" data-copy aria-label="Copy code">Copy</button></div><div class="ag-tut-code-body"><pre><code>npm test</code></pre></div></figure>
+<p>Tests use generated local signing keys, constructed calldata and injected CLI, HTTP and RPC responses. They need no credentials, <code>mm</code> installation, funded wallet or deployed service. See <a href="https://github.com/arcgate-dev/tutorials/blob/main/arc-metamask/VALIDATION.md">VALIDATION.md</a> for live results and limitations.</p>
+<p>For the API contract, see the <a href="https://docs.arcgate.dev">API reference</a> and <a href="https://api.arcgate.dev/openapi.json">OpenAPI document</a>. The <a href="../circle-agent-wallet/">Circle tutorial</a> demonstrates the separate <code>approval: &quot;approve&quot;</code> path.</p>
+
+        </article>
+      </div>
+    </main>
+    <footer class="ag-footer">
+      <div class="ag-mark ag-mark-sm" aria-hidden="true">
+        <span class="ag-word">arc</span><span class="ag-gatebar"></span><span class="ag-word">gate</span>
+      </div>
+      <nav class="ag-foot-nav" aria-label="footer">
+        <a href="https://arcgate.dev/">arcgate.dev</a>
+        <a href="../../#arcgate/description/prices">Pricing</a>
+        <a href="https://api.arcgate.dev/health">API health</a>
+        <span class="ag-chain">Arc mainnet · chain 5042</span>
+      </nav>
+    </footer>
+    <div class="ag-sr-only" role="status" aria-live="polite" data-ag-live></div>
+    <script src="../../tutorials.js"></script>
+  </body>
+</html>
