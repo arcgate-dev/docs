@@ -20,7 +20,7 @@
     {
       "name": "service",
       "x-displayName": "Service",
-      "description": "Health checks and this OpenAPI document."
+      "description": "Health checks, this OpenAPI document and the ERC-8004 agent registration file."
     }
   ],
   "security": [],
@@ -4699,6 +4699,49 @@
           }
         }
       }
+    },
+    "/.well-known/agent-registration.json": {
+      "get": {
+        "operationId": "agentRegistration",
+        "tags": [
+          "service"
+        ],
+        "summary": "arcgate's ERC-8004 agent registration file",
+        "description": "Returns the registration file arcgate's ERC-8004 IdentityRegistry entry points at.\n\n- **Cost:** free, never x402-gated.\n- **Returns:** the spec's `type`, `name`, `description`, `image`, `services`, `x402Support`, `active`, `registrations` and `supportedTrust`, plus `arcgate`: the trading network, x402 prices per route, and links to this document, the venues, the docs and the agent skill.\n- **Next:** rate arcgate on the ReputationRegistry against the `agentId` in `registrations`.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Registration file.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRegistration"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "description": "internal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -8354,6 +8397,195 @@
           "network"
         ],
         "additionalProperties": {}
+      },
+      "AgentRegistration": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "const": "https://eips.ethereum.org/EIPS/eip-8004#registration-v1"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string"
+          },
+          "services": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "endpoint": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "endpoint"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "x402Support": {
+            "type": "boolean"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "registrations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "agentId": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                "agentRegistry": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "agentId",
+                "agentRegistry"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "supportedTrust": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "arcgate": {
+            "type": "object",
+            "properties": {
+              "tradingNetwork": {
+                "type": "string"
+              },
+              "payment": {
+                "type": "object",
+                "properties": {
+                  "network": {
+                    "type": "string"
+                  },
+                  "asset": {
+                    "type": "string"
+                  },
+                  "prices": {
+                    "type": "object",
+                    "properties": {
+                      "search": {
+                        "type": "string",
+                        "pattern": "^\\d+$"
+                      },
+                      "quote": {
+                        "type": "string",
+                        "pattern": "^\\d+$"
+                      },
+                      "swap": {
+                        "type": "object",
+                        "properties": {
+                          "under1000Usd": {
+                            "type": "string",
+                            "pattern": "^\\d+$"
+                          },
+                          "upTo10000Usd": {
+                            "type": "string",
+                            "pattern": "^\\d+$"
+                          },
+                          "above10000Usd": {
+                            "type": "object",
+                            "properties": {
+                              "base": {
+                                "type": "string",
+                                "pattern": "^\\d+$"
+                              },
+                              "bpsOfNotionalAbove10000Usd": {
+                                "type": "string"
+                              },
+                              "max": {
+                                "type": "string",
+                                "pattern": "^\\d+$"
+                              }
+                            },
+                            "required": [
+                              "base",
+                              "bpsOfNotionalAbove10000Usd",
+                              "max"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "under1000Usd",
+                          "upTo10000Usd",
+                          "above10000Usd"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": [
+                      "search",
+                      "quote",
+                      "swap"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "network",
+                  "asset",
+                  "prices"
+                ],
+                "additionalProperties": false
+              },
+              "openapi": {
+                "type": "string"
+              },
+              "venues": {
+                "type": "string"
+              },
+              "docs": {
+                "type": "string"
+              },
+              "skill": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "tradingNetwork",
+              "payment",
+              "openapi",
+              "venues",
+              "docs",
+              "skill"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "type",
+          "name",
+          "description",
+          "image",
+          "services",
+          "x402Support",
+          "active",
+          "registrations",
+          "supportedTrust",
+          "arcgate"
+        ],
+        "additionalProperties": false
       },
       "X402MiddlewareError": {
         "type": "object",
