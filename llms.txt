@@ -1,0 +1,19 @@
+# arcgate
+
+> Search, quote and swap on Arc. Pay per call in USDC with x402. arcgate returns unsigned transactions: your wallet signs, arcgate never does.
+
+## API
+
+- [API reference](https://docs.arcgate.dev/): every endpoint, its price, request, response and errors
+- [OpenAPI document](https://api.arcgate.dev/openapi.json): the full API as OpenAPI 3.1
+- [MCP server](https://api.arcgate.dev/trade/v1/mcp): the same paid calls as MCP tools, over streamable HTTP
+- [Agent registration](https://api.arcgate.dev/.well-known/agent-registration.json): arcgate's ERC-8004 registration file
+
+## Agent skill
+
+- [arcgate-trade](https://docs.arcgate.dev/plugin/skills/arcgate-trade/SKILL.md): Use when an agent needs to turn a plain-English crypto order on Arc ("buy 100 USDC of X", "sell my MOLLY for USDC") into a checked trade through the arcgate API - resolve the token, quote it, read the safety verdict, and get unsigned transactions for the user's wallet. Every search, quote and swap is paid per call in real USDC over x402; includes a script that makes those paid calls with a wallet key.
+
+## Tutorials
+
+- [Trade through arcgate with a Circle agent wallet](https://docs.arcgate.dev/tutorials/circle-agent-wallet/): Connect a Circle Developer-Controlled Wallet to api.arcgate.dev, pay x402, and trade on Arc mainnet.
+- [Trade through arcgate with MetaMask Agent Wallet](https://docs.arcgate.dev/tutorials/metamask-agent-wallet/): Connect MetaMask Agent Wallet 7.0.0 to api.arcgate.dev, pay x402, sign Permit2, and trade on Arc mainnet, with the trade sent in MetaMask's Beast Mode.
