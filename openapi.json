@@ -8424,6 +8424,15 @@
                 },
                 "endpoint": {
                   "type": "string"
+                },
+                "version": {
+                  "type": "string"
+                },
+                "mcpTools": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 }
               },
               "required": [
