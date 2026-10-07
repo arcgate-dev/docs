@@ -621,17 +621,41 @@ html.ag-dark .ag-chain {
   font-weight: 400;
   color: var(--scalar-color-2);
 }
-.scalar-app .markdown td:last-child,
-.scalar-app .markdown th:last-child {
+/* Only the price tables get the numeric last column: docs.js sets data-price on a table whose last
+ * header starts with "USDC". Scalar's sanitizer strips classes, so a prose table (next | Meaning, a
+ * status table) keeps the default left-aligned cells. */
+.scalar-app .markdown table[data-price] td:last-child,
+.scalar-app .markdown table[data-price] th:last-child {
   text-align: right;
   font-family: var(--ag-mono);
   font-stretch: 87.5%;
   font-variant-numeric: tabular-nums;
   padding-right: 0;
 }
-.scalar-app .markdown tr:last-child td:last-child {
+.scalar-app .markdown table[data-price] td[data-free] {
   color: var(--scalar-color-green);
   font-weight: 600;
+}
+/* A cell holding one code word (a kind, a field, an op) never breaks it mid-word when the table squeezes
+ * its column; cells listing several still wrap between them. */
+.scalar-app .markdown td > code:only-child {
+  white-space: nowrap;
+}
+/* Every price table has the same three columns at the same widths, so the tables line up. */
+.scalar-app .markdown table[data-price] {
+  table-layout: fixed;
+}
+.scalar-app .markdown table[data-price] th:first-child,
+.scalar-app .markdown table[data-price] td:first-child {
+  width: 40%;
+}
+.scalar-app .markdown table[data-price] th:last-child,
+.scalar-app .markdown table[data-price] td:last-child {
+  width: 18%;
+  white-space: nowrap;
+}
+.scalar-app .markdown table[data-price] td:first-child {
+  overflow-wrap: anywhere;
 }
 
 /* The pipeline rail: the landing's Pipeline in its narrow (stacked) form. Scalar's sanitizer strips

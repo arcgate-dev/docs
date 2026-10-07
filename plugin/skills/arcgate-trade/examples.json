@@ -46,5 +46,95 @@
       "amount": "100",
       "side": "exactOut"
     }
+  },
+  {
+    "id": "box-create",
+    "order": "set up a box for me",
+    "reading": "Create the box at your own address: the place its messages land. The call takes no request.",
+    "operation": "boxCreate"
+  },
+  {
+    "id": "inbound-create",
+    "order": "give me an address other agents can post to",
+    "reading": "Create an inbound address in your box. The answer has its `url` and `secret`: a sender signs its post with the secret (inboundPost does), and what it posts lands in your box. The call takes no request.",
+    "operation": "inboundCreate"
+  },
+  {
+    "id": "token-watch",
+    "order": "tell me when cirBTC's 24h volume passes $1",
+    "reading": "Watch the one token cirBTC (resolve its address first) with one clause: its 24 hour volume greater than 1 USD. The hit arrives in your box as a `watch.token` message.",
+    "operation": "watchCreate",
+    "request": {
+      "condition": {
+        "kind": "token",
+        "token": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
+        "where": [
+          {
+            "field": "volume_24h",
+            "op": "gt",
+            "value": 1
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "screen-watch",
+    "order": "tell me about any token whose 24h volume passes $1",
+    "reading": "Watch every token the index reports, not one named token: a screen that fires for each token whose 24 hour volume comes to be greater than 1 USD. Each hit is a `watch.screen` message.",
+    "operation": "watchCreate",
+    "request": {
+      "condition": {
+        "kind": "screen",
+        "where": [
+          {
+            "field": "volume_24h",
+            "op": "gt",
+            "value": 1
+          }
+        ]
+      }
+    }
+  },
+  {
+    "id": "agents-watch",
+    "order": "tell me when a new agent registers on Arc",
+    "reading": "Watch every agent of Arc's agent directory (chain 5042): an agent screen that fires for each agent registered after the watch was made. Each hit is a `watch.agent` message.",
+    "operation": "watchCreate",
+    "request": {
+      "condition": {
+        "kind": "agents",
+        "chainId": 5042,
+        "on": [
+          "registered"
+        ]
+      }
+    }
+  },
+  {
+    "id": "agent-watch",
+    "order": "tell me when agent 1365 changes its wallet or gets feedback",
+    "reading": "Watch the one agent 1365 of Arc's agent directory for a payment wallet change or new feedback. Each hit is a `watch.agent` message.",
+    "operation": "watchCreate",
+    "request": {
+      "condition": {
+        "kind": "agent",
+        "chainId": 5042,
+        "agentId": 1365,
+        "on": [
+          "wallet_changed",
+          "feedback"
+        ]
+      }
+    }
+  },
+  {
+    "id": "webhook-create",
+    "order": "push my messages to https://192.0.2.10/hook",
+    "reading": "Create a webhook channel: arcgate posts each message in your box to the URL, signed with the channel's `secret`. The URL must be https on a public address.",
+    "operation": "webhookCreate",
+    "request": {
+      "url": "https://192.0.2.10/hook"
+    }
   }
 ]

@@ -6,8 +6,9 @@
   var OPENAPI_DOWNLOAD = "none";
 
   // Operations are listed in the order a caller uses them, not alphabetically.
-  var OPERATION_ORDER = ["tradeSearch", "tradeQuote", "tradeSwap", "tradeReceipt", "tradeVenues", "tradeMcp", "health", "openapi"];
-  var TAG_ORDER = ["trade", "service"];
+  // Tag and group order are not set here: the document's `tags` and `x-tagGroups`
+  // (TAG_GROUPS in packages/core/src/openapi/document.ts) carry them, and Scalar follows the document.
+  var OPERATION_ORDER = ["tradeSearch", "tradeQuote", "tradeSwap", "tradeSwapTx", "tradeReceipt", "tradeVenues", "agentSearch", "agentProfile", "agentWallet", "boxCreate", "boxTopUp", "boxStatus", "boxMessageList", "boxMessageFetch", "boxMessageDelete", "inboundCreate", "inboundList", "inboundDelete", "inboundRotate", "watchCreate", "watchList", "watchDelete", "webhookCreate", "webhookList", "webhookDelete", "webhookRotate", "webhookEnable", "telegramCreate", "telegramList", "telegramDelete", "telegramLink", "mcp", "mcpInfo", "health", "openapi", "agentRegistration"];
 
   function rank(list, key) {
     var i = list.indexOf(key);
@@ -22,7 +23,7 @@
   // Scalar sends every Test Request through customFetch. Calls to this API that answer 402, and
   // MCP tool calls that answer with a price, are paid with x402's own client (loaded on first use) and a signer over the visitor's EIP-1193
   // wallet, then retried. Nothing else is ever paid: other origins go straight to fetch, only Arc
-  // USDC is accepted, and no single payment may exceed the top swap fee.
+  // USDC is accepted, and no single payment may exceed the largest price the API's own document lists.
   var API_ORIGIN = (function () {
     var meta = document.querySelector('meta[name="arcgate-api"]');
     try {
@@ -34,12 +35,11 @@
   var X402_CDN = "https://cdn.jsdelivr.net/npm/@x402/";
   var USDC = "0x3600000000000000000000000000000000000000";
   var PAY_NETWORKS = ["eip155:5042002", "eip155:5042"]; // Arc testnet, Arc mainnet
-  var MAX_PAYMENT = "5000000"; // 5 USDC, the top swap fee
   var ARC_TESTNET = {
     chainId: "0x4cef52",
     chainName: "Arc Testnet",
     rpcUrls: ["https://rpc.testnet.arc.io"],
-    blockExplorerUrls: ["https://testnet.arcscan.app"],
+    blockExplorerUrls: ["https://explorer.testnet.arc.io"],
     nativeCurrency: { name: "USDC", symbol: "USDC", decimals: 18 },
   };
   // x402 hands over viem-style typed data (no EIP712Domain type); eth_signTypedData_v4 needs it.
@@ -78,6 +78,27 @@
     };
   }
 
+  // The most any operation can charge: the largest x-payment amount (a flat price or a swap tier) in
+  // the API's live GET /openapi.json, read when the wallet is first connected on the page. A
+  // price_max raised by `config:set` after that applies once the page is reloaded. A failed read
+  // refuses payment.
+  async function maxPayment() {
+    var res = await fetch(API_ORIGIN + "/openapi.json");
+    if (!res.ok) throw new Error("Could not read the API's prices (GET /openapi.json answered " + res.status + "), so nothing was paid.");
+    var doc = await res.json();
+    var max = 0n;
+    Object.values(doc.paths).forEach(function (methods) {
+      Object.values(methods).forEach(function (operation) {
+        var payment = operation["x-payment"];
+        if (!payment) return;
+        (payment.tiers || [payment]).forEach(function (price) {
+          if (BigInt(price.baseUnits) > max) max = BigInt(price.baseUnits);
+        });
+      });
+    });
+    return max.toString();
+  }
+
   // One x402 client per connected account, made on the first 402 (free calls never prompt).
   var payerPromise = null;
   function payer() {
@@ -93,6 +114,7 @@
         });
       }
       var accounts = await ethereum.request({ method: "eth_requestAccounts" });
+      var maxAmountPerPayment = await maxPayment();
       var mods = await Promise.all([import(X402_CDN + "core@2.27.0/client/+esm"), import(X402_CDN + "evm@2.27.0/exact/client/+esm")]);
       var signer = walletSigner(ethereum, accounts[0]);
       var client = mods[0].x402Client.fromConfig({
@@ -101,7 +123,7 @@
         }),
         spendControls: {
           allowedAssets: PAY_NETWORKS.map(function (network) {
-            return { network: network, asset: USDC, maxAmountPerPayment: MAX_PAYMENT };
+            return { network: network, asset: USDC, maxAmountPerPayment: maxAmountPerPayment };
           }),
         },
       });
@@ -113,7 +135,8 @@
     return payerPromise;
   }
 
-  var MCP_PATH = "/trade/v1/mcp";
+  // The gateway's MCP endpoint (MCP_PATH in packages/core/src/openapi/document.ts).
+  var MCP_PATH = "/mcp";
 
   async function payFetch(input, init) {
     var request = new Request(input, init);
@@ -121,7 +144,8 @@
     if (url.origin !== API_ORIGIN) return fetch(request);
     // The request examples' PAYMENT-SIGNATURE is a placeholder; a real one is added below.
     request.headers.delete("payment-signature");
-    var isMcp = request.method === "POST" && url.pathname.replace(/\/+$/, "").toLowerCase() === MCP_PATH;
+    var mcpPath = url.pathname.replace(/\/+$/, "").toLowerCase();
+    var isMcp = request.method === "POST" && mcpPath === MCP_PATH;
     var mcpCall = isMcp ? await request.clone().text() : null;
     var response = await fetch(request.clone());
     try {
@@ -219,9 +243,6 @@
     hiddenClients: { c: true, clojure: true, csharp: true, dart: true, fsharp: true, http: true, java: true, kotlin: true, objc: true, ocaml: true, php: true, powershell: true, r: true, ruby: true, rust: true, swift: true },
     orderSchemaPropertiesBy: "preserve",
     orderRequiredPropertiesFirst: true,
-    tagsSorter: function (a, b) {
-      return rank(TAG_ORDER, a.name) - rank(TAG_ORDER, b.name);
-    },
     operationsSorter: function (a, b) {
       return rank(OPERATION_ORDER, operationKey(a)) - rank(OPERATION_ORDER, operationKey(b));
     },
@@ -285,6 +306,23 @@
       });
     });
   }
-  setInterval(syncExamples, 300);
+  // The Prices tables are the only ones with a numeric last column (theme.css styles [data-price]).
+  // The sanitizer strips classes, so mark them by the header: the last one starts with "USDC". A price
+  // cell that reads "free" is marked too (data-free), so only free reads green, whatever row it is on.
+  function tagPriceTables() {
+    var tables = document.querySelectorAll(".markdown table");
+    for (var i = 0; i < tables.length; i++) {
+      var heads = tables[i].querySelectorAll("th");
+      var last = heads.length ? heads[heads.length - 1].textContent.trim() : "";
+      if (!/^USDC/.test(last)) continue;
+      if (!tables[i].hasAttribute("data-price")) tables[i].setAttribute("data-price", "");
+      var prices = tables[i].querySelectorAll("td:last-child");
+      for (var j = 0; j < prices.length; j++) {
+        if (prices[j].textContent.trim() === "free" && !prices[j].hasAttribute("data-free")) prices[j].setAttribute("data-free", "");
+      }
+    }
+  }
+  setInterval(function () { syncExamples(); tagPriceTables(); }, 300);
   syncExamples();
+  tagPriceTables();
 })();

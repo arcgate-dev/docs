@@ -1,6 +1,6 @@
-/* arcgate docs: tutorial pages (issue #55).
+/* arcgate docs: the tutorials index (issue #55).
  *
- * Tutorial pages don't run inside Scalar, so they key off html.ag-dark (set by the pre-paint
+ * The index doesn't run inside Scalar, so it keys off html.ag-dark (set by the pre-paint
  * script and tutorials.js) and the landing tokens directly, not the --scalar-* variables, which
  * only resolve inside .light-mode/.dark-mode on the reference page. theme.css still supplies the
  * fonts, tokens, header/footer and .ag-fonts-pending rules shared with the reference.
@@ -21,346 +21,6 @@ html.ag-dark body {
   .ag-tut-main {
     padding: 0 20px 40px;
   }
-}
-
-/* ---------- tutorial article + sticky TOC ---------- */
-/* Title block, TOC and body are siblings so the TOC can sit beside the whole article on desktop
- * and directly under the title on phones. */
-.ag-tut-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 72ch) 240px;
-  grid-template-areas:
-    "head toc"
-    "body toc";
-  grid-template-rows: auto 1fr;
-  column-gap: 56px;
-  max-width: 1040px;
-  margin: 40px auto 0;
-  align-items: start;
-}
-.ag-tut-head {
-  grid-area: head;
-  margin-bottom: 8px;
-}
-.ag-tut-body {
-  grid-area: body;
-}
-.ag-tut-grid > .ag-tut-toc {
-  grid-area: toc;
-}
-@media (max-width: 900px) {
-  .ag-tut-grid {
-    grid-template-columns: minmax(0, 1fr);
-    grid-template-areas:
-      "head"
-      "toc"
-      "body";
-    grid-template-rows: auto;
-  }
-}
-
-.ag-tut-prose {
-  min-width: 0;
-  max-width: 72ch;
-  font-size: 15.5px;
-  line-height: 1.7;
-}
-.ag-tut-prose h1 {
-  font-size: var(--scalar-heading-1, 40px);
-  font-weight: 700;
-  letter-spacing: -0.028em;
-  line-height: 1.12;
-  margin: 0 0 14px;
-}
-.ag-tut-prose h2,
-.ag-tut-prose h3 {
-  line-height: 1.25;
-}
-.ag-tut-prose .ag-tut-description {
-  font-size: 17px;
-  line-height: 1.5;
-  color: var(--muted);
-  margin: 0 0 12px;
-}
-html.ag-dark .ag-tut-prose .ag-tut-description {
-  color: rgba(238, 241, 235, 0.62);
-}
-.ag-tut-prose .ag-tut-wallet {
-  display: inline-block;
-  font-family: var(--ag-mono);
-  font-stretch: 87.5%;
-  font-size: 11.5px;
-  border: 1px dashed var(--rule2);
-  border-radius: 2px;
-  padding: 3px 8px;
-  margin: 0 0 20px;
-  color: var(--muted);
-}
-html.ag-dark .ag-tut-prose .ag-tut-wallet {
-  border-color: rgba(238, 241, 235, 0.25);
-  color: rgba(238, 241, 235, 0.62);
-}
-.ag-tut-banner {
-  background: rgba(200, 150, 30, 0.12);
-  border: 1px solid var(--brass);
-  border-radius: 3px;
-  padding: 10px 14px;
-  font-size: 13.5px;
-  font-weight: 500;
-  margin: 0 0 24px;
-}
-
-.ag-tut-prose h2,
-.ag-tut-prose h3 {
-  font-weight: 700;
-  letter-spacing: -0.028em;
-  scroll-margin-top: calc(var(--ag-header-h) + 16px);
-}
-.ag-tut-prose h2 {
-  font-size: 24px;
-  margin: 2em 0 0.6em;
-}
-.ag-tut-prose h3 {
-  font-size: 18px;
-  margin: 1.6em 0 0.5em;
-}
-.ag-tut-prose p,
-.ag-tut-prose ul,
-.ag-tut-prose ol {
-  margin: 0 0 1em;
-}
-.ag-tut-prose :not(pre) > code {
-  font-family: var(--ag-mono);
-  font-stretch: 87.5%;
-  font-size: 0.85em;
-  font-weight: 500;
-}
-.ag-tut-prose table {
-  border-collapse: collapse;
-  width: 100%;
-  border-top: 1px solid currentColor;
-  margin: 0 0 1.4em;
-}
-.ag-tut-prose th,
-.ag-tut-prose td {
-  border-bottom: 1px solid var(--rule);
-  padding: 8px 10px 8px 0;
-  text-align: left;
-}
-html.ag-dark .ag-tut-prose th,
-html.ag-dark .ag-tut-prose td {
-  border-bottom-color: rgba(238, 241, 235, 0.16);
-}
-.ag-tut-prose th {
-  font-family: var(--ag-mono);
-  font-stretch: 87.5%;
-  font-size: 10.5px;
-  letter-spacing: 0.04em;
-  font-weight: 400;
-  color: var(--muted);
-}
-
-/* numbered step badge */
-.ag-tut-step-heading {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.ag-tut-step-badge {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  border: 1.5px solid currentColor;
-  font-family: var(--ag-mono);
-  font-stretch: 87.5%;
-  font-size: 13px;
-}
-.ag-tut-step-text {
-  min-width: 0;
-}
-
-/* ---------- table of contents ---------- */
-.ag-tut-toc {
-  position: sticky;
-  top: calc(var(--ag-header-h) + 24px);
-  font-size: 13px;
-}
-.ag-tut-toc ol {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  border-left: 1px solid var(--rule);
-}
-html.ag-dark .ag-tut-toc ol {
-  border-left-color: rgba(238, 241, 235, 0.16);
-}
-.ag-tut-toc li {
-  margin: 0;
-}
-.ag-tut-toc a {
-  display: block;
-  padding: 6px 0 6px 14px;
-  color: var(--muted);
-  text-decoration: none;
-}
-html.ag-dark .ag-tut-toc a {
-  color: rgba(238, 241, 235, 0.62);
-}
-.ag-tut-toc a:hover {
-  color: inherit;
-  text-decoration: underline;
-}
-.ag-tut-toc-mobile summary {
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 13px;
-  padding: 4px 0;
-}
-@media (min-width: 901px) {
-  .ag-tut-toc-mobile summary {
-    display: none;
-  }
-  .ag-tut-toc-mobile {
-    display: block;
-  }
-}
-@media (max-width: 900px) {
-  .ag-tut-toc {
-    position: static;
-    margin: 0 0 28px;
-    border: 1px solid var(--rule);
-    border-radius: 3px;
-    padding: 4px 14px;
-  }
-  html.ag-dark .ag-tut-toc {
-    border-color: rgba(238, 241, 235, 0.16);
-  }
-  .ag-tut-toc ol {
-    border-left: 0;
-    margin-top: 6px;
-  }
-}
-
-/* ---------- callouts ---------- */
-.ag-tut-callout {
-  border-left: 3px solid var(--rule2);
-  background: var(--sheet);
-  border-radius: 0 3px 3px 0;
-  padding: 12px 16px;
-  margin: 0 0 1.2em;
-}
-html.ag-dark .ag-tut-callout {
-  background: var(--ag-panel-2);
-  border-left-color: rgba(238, 241, 235, 0.3);
-}
-.ag-tut-callout p:last-child {
-  margin-bottom: 0;
-}
-.ag-tut-callout-title {
-  font-family: var(--ag-mono);
-  font-stretch: 87.5%;
-  font-size: 11.5px;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  font-weight: 600;
-  margin: 0 0 6px;
-}
-.ag-tut-callout-note {
-  border-left-color: var(--ag-note-text);
-}
-.ag-tut-callout-tip {
-  border-left-color: var(--ag-brass-text);
-}
-.ag-tut-callout-warning {
-  border-left-color: var(--ag-serial-text);
-}
-/* the strongest callout: the serial/red token, and the only one with a tinted ground */
-.ag-tut-callout-secret {
-  border-left-color: var(--serial);
-  background: rgba(209, 52, 47, 0.08);
-}
-html.ag-dark .ag-tut-callout-secret {
-  background: rgba(232, 98, 92, 0.1);
-}
-.ag-tut-callout-secret .ag-tut-callout-title {
-  color: var(--ag-serial-text);
-}
-html.ag-dark .ag-tut-callout-secret .ag-tut-callout-title {
-  color: #e8625c;
-}
-
-/* ---------- code panel (the landing's CodeSection look) ---------- */
-.ag-tut-code {
-  margin: 0 0 1.4em;
-  border: 1px solid var(--ag-panel-line);
-  border-radius: 3px;
-  overflow: hidden;
-  background: var(--ag-panel);
-}
-.ag-tut-code-caption {
-  font-family: var(--ag-mono);
-  font-stretch: 87.5%;
-  font-size: 11.5px;
-  color: rgba(238, 241, 235, 0.62);
-  border-bottom: 1px solid var(--ag-panel-line);
-  padding: 6px 8px 6px 14px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.ag-tut-code-caption > span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.ag-tut-code-lang > span {
-  text-transform: lowercase;
-  color: rgba(238, 241, 235, 0.42);
-}
-.ag-tut-code-body {
-  position: relative;
-}
-.ag-tut-code pre {
-  margin: 0;
-  padding: 16px 20px;
-  overflow-x: auto;
-  color: var(--ag-panel-1);
-  font-family: var(--ag-mono);
-  font-stretch: 87.5%;
-  font-size: 12.5px;
-  line-height: 1.75;
-}
-.ag-tut-code code {
-  font-family: inherit;
-  white-space: pre;
-}
-@media (max-width: 720px) {
-  .ag-tut-code pre {
-    font-size: 11.5px;
-    padding: 14px 16px;
-  }
-}
-.ag-tut-copy {
-  flex: none;
-  font-family: var(--ag-mono);
-  font-stretch: 87.5%;
-  font-size: 11px;
-  color: rgba(238, 241, 235, 0.62);
-  background: rgba(238, 241, 235, 0.08);
-  border: 1px solid var(--ag-panel-line);
-  border-radius: 2px;
-  padding: 4px 8px;
-  cursor: pointer;
-}
-.ag-tut-copy:hover {
-  color: var(--ag-panel-1);
-  border-color: rgba(238, 241, 235, 0.32);
 }
 
 /* ---------- tutorials index ---------- */
@@ -393,8 +53,8 @@ html.ag-dark .ag-tut-card {
 }
 .ag-tut-card a {
   color: inherit;
-  text-decoration: none;
-  display: block;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .ag-tut-card h2 {
   font-size: 19px;
@@ -410,37 +70,21 @@ html.ag-dark .ag-tut-card {
 html.ag-dark .ag-tut-card p {
   color: rgba(238, 241, 235, 0.62);
 }
-.ag-tut-card-wallet {
-  font-family: var(--ag-mono);
-  font-stretch: 87.5%;
-  font-size: 11px !important;
-}
-.ag-tut-badge {
-  display: inline-block;
-  font-family: var(--ag-mono);
-  font-stretch: 87.5%;
-  font-size: 10.5px;
-  border: 1px dashed var(--rule2);
-  border-radius: 2px;
-  padding: 3px 8px;
-  color: var(--ag-brass-text);
-}
-html.ag-dark .ag-tut-badge {
-  border-color: rgba(238, 241, 235, 0.25);
-  color: var(--brass);
-}
 .ag-tut-card-agent code {
   font-family: var(--ag-mono);
   font-stretch: 87.5%;
   font-size: 0.85em;
 }
-.ag-tut-card-agent a {
-  display: inline;
+.ag-tut-repo {
+  font-size: 14px;
+  margin: 24px 0 0;
+}
+.ag-tut-repo a {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
-/* ---------- header dark-mode toggle (tutorial pages only; the reference uses Scalar's own) ---------- */
+/* ---------- header dark-mode toggle (the tutorials index only; the reference uses Scalar's own) ---------- */
 .ag-mode-toggle {
   font-family: var(--ag-mono);
   font-stretch: 87.5%;
@@ -457,7 +101,7 @@ html.ag-dark .ag-mode-toggle {
   border-color: rgba(238, 241, 235, 0.32);
 }
 
-/* Tutorial-page header nav carries one more item (Tutorials) plus the mode toggle than the
+/* The tutorials index header nav carries one more item (Tutorials) plus the mode toggle than the
  * reference's mobile nav, which only ever shows one link; tighten to fit at 390. */
 @media (max-width: 720px) {
   .ag-header .ag-nav {
@@ -471,17 +115,4 @@ html.ag-dark .ag-mode-toggle {
   .ag-header .ag-mark .ag-suffix {
     display: none;
   }
-}
-
-/* screen-reader-only live region for "Copied" */
-.ag-sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  padding: 0;
-  margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
 }

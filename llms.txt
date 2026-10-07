@@ -1,19 +1,31 @@
 # arcgate
 
-> Search, quote and swap on Arc. Pay per call in USDC with x402. arcgate returns unsigned transactions: your wallet signs, arcgate never does.
+> The gateway to Arc for agents. Search, quote and swap tokens, find agents in Arc's ERC-8004 directory, and give your agent a box with inbound addresses, watches and channels. Pay per call in USDC with x402. arcgate never holds funds or signs.
 
 ## API
 
 - [API reference](https://docs.arcgate.dev/): every endpoint, its price, request, response and errors
 - [OpenAPI document](https://api.arcgate.dev/openapi.json): the full API as OpenAPI 3.1
-- [MCP server](https://api.arcgate.dev/trade/v1/mcp): the same paid calls as MCP tools, over streamable HTTP
+- [MCP server](https://api.arcgate.dev/mcp): the same paid calls as MCP tools, over streamable HTTP
 - [Agent registration](https://api.arcgate.dev/.well-known/agent-registration.json): arcgate's ERC-8004 registration file
+
+## Services
+
+- [Trade](https://docs.arcgate.dev/#arcgate/tag/trade): Find a token, price a swap, build the transactions and confirm the fill, in this order: `tradeSearch`, `tradeQuote`, `tradeSwap` (and `tradeSwapTx` when it asks for a permit), then `tradeReceipt`.
+- [Agents](https://docs.arcgate.dev/#arcgate/tag/agents): Arc's ERC-8004 agent directory.
+- [Box](https://docs.arcgate.dev/#arcgate/tag/box): An agent's private message store, readable only by that agent.
+- [Inbound addresses](https://docs.arcgate.dev/#arcgate/tag/inbound): URLs arcgate hosts for one box.
+- [Watches](https://docs.arcgate.dev/#arcgate/tag/watches): Typed conditions over arcgate's index and its ERC-8004 agent directory.
+- [Channels](https://docs.arcgate.dev/#arcgate/tag/channels): Routes by which a box pushes a copy of each message out: a webhook channel to an HTTPS URL the agent owns, or a Telegram channel to one linked chat.
 
 ## Agent skill
 
-- [arcgate-trade](https://docs.arcgate.dev/plugin/skills/arcgate-trade/SKILL.md): Use when an agent needs to turn a plain-English crypto order on Arc ("buy 100 USDC of X", "sell my MOLLY for USDC") into a checked trade through the arcgate API - resolve the token, quote it, read the safety verdict, and get unsigned transactions for the user's wallet. Every search, quote and swap is paid per call in real USDC over x402; includes a script that makes those paid calls with a wallet key.
+- [arcgate-trade](https://docs.arcgate.dev/plugin/skills/arcgate-trade/SKILL.md): Use when an agent needs to turn a plain-English crypto order on Arc ("buy 100 USDC of X", "sell my MOLLY for USDC") into a checked trade through the arcgate API - resolve the token, quote it, read the safety verdict, and get unsigned transactions for the user's wallet - or to set up its own box with inbound addresses others can post to, watches ("tell me when MOLLY gets a new pool") and channels (a webhook or Telegram) that deliver what it hears. Every search, quote, swap and create is paid per call in real USDC over x402; includes a script that makes those paid calls with a wallet key. Your first message after loading this skill, before any command, is a `Spend:` line listing each paid call you may make, with its price in USDC.
 
 ## Tutorials
 
-- [Trade through arcgate with a Circle agent wallet](https://docs.arcgate.dev/tutorials/circle-agent-wallet/): Connect a Circle Developer-Controlled Wallet to api.arcgate.dev, pay x402, and trade on Arc mainnet.
-- [Trade through arcgate with MetaMask Agent Wallet](https://docs.arcgate.dev/tutorials/metamask-agent-wallet/): Connect MetaMask Agent Wallet 7.0.0 to api.arcgate.dev, pay x402, sign Permit2, and trade on Arc mainnet, with the trade sent in MetaMask's Beast Mode.
+- [Circle wallet → Arcgate](https://github.com/arcgate-dev/tutorials/tree/main/arc-circle): Pay for API calls over x402 with a Circle developer-controlled wallet and trade USDC for cirBTC.
+- [MetaMask Agent Wallet → Arcgate](https://github.com/arcgate-dev/tutorials/tree/main/arc-metamask): Pay over x402 with MetaMask Agent Wallet's mm CLI, sign a Permit2 permit and trade USDC for cirBTC in Beast Mode.
+- [Agent box → Arcgate](https://github.com/arcgate-dev/tutorials/tree/main/arc-agent-box): Give an agent a box with an inbound address, watches over Arcgate's index and a webhook channel, paying over x402 and signing owner calls with its wallet.
+- [Arcgate as a paid MCP server](https://github.com/arcgate-dev/tutorials/tree/main/arc-mcp): Connect an MCP client to /mcp, call the free tools, and pay for tradeSearch, tradeQuote and boxCreate over x402 under a spend cap.
+- [Claude Agent SDK bot → Arcgate](https://github.com/arcgate-dev/tutorials/tree/main/arc-claude-agent): Build a Claude Agent SDK bot that turns one sentence into a box, a screen watch and an inbound address, then summarises each message the box receives.

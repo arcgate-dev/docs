@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Tutorials · arcgate docs</title>
-    <meta name="description" content="Step-by-step tutorials for trading on Arc through arcgate." />
+    <meta name="description" content="Step-by-step tutorials for trading on Arc, running an agent box and using the MCP server through arcgate." />
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#EEF1EB" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#101815" media="(prefers-color-scheme: dark)" />
@@ -32,14 +32,12 @@
   <body>
     <a class="ag-skip" href="#ag-tut-article">Skip to the article</a>
     <header class="ag-header">
-      <a class="ag-mark" href="https://arcgate.dev/" aria-label="arcgate.dev home">
+      <a class="ag-mark" href="../" aria-label="arcgate docs home">
         <span class="ag-word">arc</span><span class="ag-gatebar" aria-hidden="true"></span><span class="ag-word">gate</span><span class="ag-suffix">docs</span>
       </a>
       <nav class="ag-nav" aria-label="arcgate">
-        <a class="ag-hide-sm" href="../#arcgate/description/prices">Pricing</a>
-        <a class="ag-hide-sm" href="https://arcgate.dev/">arcgate.dev</a>
         <a class="ag-current" href="../tutorials/" aria-current="page">Tutorials</a>
-        <a href="../">API reference</a>
+        <a href="https://arcgate.dev/">arcgate.dev</a>
         <button type="button" class="ag-mode-toggle" data-ag-mode-toggle aria-label="Toggle dark mode"><span data-ag-mode-label>Dark</span></button>
       </nav>
     </header>
@@ -48,31 +46,41 @@
         <h1>Tutorials</h1>
         <ul class="ag-tut-cards">
           <li class="ag-tut-card">
-          <a href="./circle-agent-wallet/">
-            <h2>Trade through arcgate with a Circle agent wallet</h2>
-            <p>Connect a Circle Developer-Controlled Wallet to api.arcgate.dev, pay x402, and trade on Arc mainnet.</p>
-            <p class="ag-tut-card-wallet">Circle agent wallet</p>
-            
-          </a>
+          <h2>Circle wallet → Arcgate</h2>
+          <p>Pay for API calls over x402 with a Circle developer-controlled wallet and trade USDC for cirBTC.</p>
+          <p><a href="https://github.com/arcgate-dev/tutorials/tree/main/arc-circle">Open the tutorial on GitHub</a></p>
         </li>
 <li class="ag-tut-card">
-          <a href="./metamask-agent-wallet/">
-            <h2>Trade through arcgate with MetaMask Agent Wallet</h2>
-            <p>Connect MetaMask Agent Wallet 7.0.0 to api.arcgate.dev, pay x402, sign Permit2, and trade on Arc mainnet, with the trade sent in MetaMask&#39;s Beast Mode.</p>
-            <p class="ag-tut-card-wallet">MetaMask Agent Wallet</p>
-            
-          </a>
+          <h2>MetaMask Agent Wallet → Arcgate</h2>
+          <p>Pay over x402 with MetaMask Agent Wallet&#39;s mm CLI, sign a Permit2 permit and trade USDC for cirBTC in Beast Mode.</p>
+          <p><a href="https://github.com/arcgate-dev/tutorials/tree/main/arc-metamask">Open the tutorial on GitHub</a></p>
+        </li>
+<li class="ag-tut-card">
+          <h2>Agent box → Arcgate</h2>
+          <p>Give an agent a box with an inbound address, watches over Arcgate&#39;s index and a webhook channel, paying over x402 and signing owner calls with its wallet.</p>
+          <p><a href="https://github.com/arcgate-dev/tutorials/tree/main/arc-agent-box">Open the tutorial on GitHub</a></p>
+        </li>
+<li class="ag-tut-card">
+          <h2>Arcgate as a paid MCP server</h2>
+          <p>Connect an MCP client to /mcp, call the free tools, and pay for tradeSearch, tradeQuote and boxCreate over x402 under a spend cap.</p>
+          <p><a href="https://github.com/arcgate-dev/tutorials/tree/main/arc-mcp">Open the tutorial on GitHub</a></p>
+        </li>
+<li class="ag-tut-card">
+          <h2>Claude Agent SDK bot → Arcgate</h2>
+          <p>Build a Claude Agent SDK bot that turns one sentence into a box, a screen watch and an inbound address, then summarises each message the box receives.</p>
+          <p><a href="https://github.com/arcgate-dev/tutorials/tree/main/arc-claude-agent">Open the tutorial on GitHub</a></p>
         </li>
           <li class="ag-tut-card ag-tut-card-agent">
           <h2>Using arcgate from an agent</h2>
-          <p>arcgate is also a paid MCP server at <code>POST /trade/v1/mcp</code> (Model Context
-          Protocol): an x402-aware MCP client calls search, quote, swap and venues as tools, at the
+          <p>arcgate is also a paid MCP server at <code>POST /mcp</code> (Model Context
+          Protocol): an x402-aware MCP client calls the trade routes and the agent directory as tools, at the
           same prices. Agents that take plain-English orders can load the
           <code>arcgate-trade</code> skill at
           <a href="../plugin/skills/arcgate-trade/SKILL.md"><code>/plugin/skills/arcgate-trade/SKILL.md</code></a>.
           See <a href="../#arcgate/description/mcp-for-agents">MCP for agents</a> in the reference.</p>
         </li>
         </ul>
+        <p class="ag-tut-repo">Every tutorial lives in <a href="https://github.com/arcgate-dev/tutorials#readme">arcgate-dev/tutorials</a>.</p>
       </div>
     </main>
     <footer class="ag-footer">
@@ -86,7 +94,6 @@
         <span class="ag-chain">Arc mainnet · chain 5042</span>
       </nav>
     </footer>
-    <div class="ag-sr-only" role="status" aria-live="polite" data-ag-live></div>
     <script src="../tutorials.js"></script>
   </body>
 </html>
