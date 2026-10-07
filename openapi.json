@@ -69,7 +69,7 @@
     {
       "name": "service",
       "x-displayName": "Service",
-      "description": "Health checks, this OpenAPI document and the ERC-8004 agent registration file."
+      "description": "Health checks, this OpenAPI document, the ERC-8004 agent registration file and the AgentKarma manifest."
     }
   ],
   "x-tagGroups": [
@@ -191,14 +191,14 @@
                             "creatorLinked": false,
                             "depth2PctUsd": "64000",
                             "depthKind": "lower_bound",
-                            "depthAgeSec": 1197304,
+                            "depthAgeSec": 1200227,
                             "volume24hUsd": "934.1393915596246",
                             "traders24h": 23,
                             "trades24h": 557,
                             "sells24h": null,
                             "sellers24h": null,
                             "topTraderShare24h": null,
-                            "ageHours": 3572.2219444444445,
+                            "ageHours": 3573.0338888888887,
                             "posterior": null
                           },
                           "discovered": "index",
@@ -298,14 +298,14 @@
                             "creatorLinked": false,
                             "depth2PctUsd": "1297.955611",
                             "depthKind": "measured",
-                            "depthAgeSec": 451377,
+                            "depthAgeSec": 454300,
                             "volume24hUsd": "531987.846046",
                             "traders24h": 817,
                             "trades24h": 3382,
                             "sells24h": null,
                             "sellers24h": null,
                             "topTraderShare24h": null,
-                            "ageHours": 517.8369444444445,
+                            "ageHours": 518.6488888888889,
                             "posterior": 0.36526881103966014
                           },
                           "discovered": "index",
@@ -468,7 +468,7 @@
                     "$ref": "#/components/schemas/SettleResponse"
                   }
                 },
-                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4NUVkZmY4MkYwRTdEQzI1OTY4Y2JhOEI2MTRiZURENzgyYWMyY0VERCIsInRyYW5zYWN0aW9uIjoiMHg5NTUwNzdhMjQ1M2RhMjdkM2UxZTk0YTNlYjY5MzUwNjI0NDYwZGE0ZjI3MjE2ZDg1ODc2NmMwNzk4M2MwMjc0IiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
+                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4NUVkZmY4MkYwRTdEQzI1OTY4Y2JhOEI2MTRiZURENzgyYWMyY0VERCIsInRyYW5zYWN0aW9uIjoiMHgwZTE1NzdkYjZlZTQ0YTA1YTNkMDcyNWNkMWFkYTIyMTgwMDZmMzNlZjYxMDA1YTEyNDhlYzk0OWE5YzQ1NGVjIiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
               }
             }
           },
@@ -670,10 +670,10 @@
                   "quoted route": {
                     "summary": "quoted route",
                     "value": {
-                      "quoteId": "q_b9607a3beeb5d2c4",
+                      "quoteId": "q_41e80c4162c5b22c",
                       "network": "eip155:5042",
                       "block": 23584091,
-                      "expiresAt": "2026-10-07T20:15:22.721Z",
+                      "expiresAt": "2026-10-07T21:04:04.988Z",
                       "side": "exactIn",
                       "sell": {
                         "address": "0x3600000000000000000000000000000000000000",
@@ -789,7 +789,7 @@
                           "block": 23584091,
                           "walletProfile": "fresh_eoa",
                           "sellDelaySec": null,
-                          "tokenAgeSec": 9771653
+                          "tokenAgeSec": 9774575
                         },
                         "note": "Both endpoints are pinned assets; graph delivery was measured at the quote block."
                       },
@@ -815,7 +815,7 @@
                     "$ref": "#/components/schemas/SettleResponse"
                   }
                 },
-                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4NUVkZmY4MkYwRTdEQzI1OTY4Y2JhOEI2MTRiZURENzgyYWMyY0VERCIsInRyYW5zYWN0aW9uIjoiMHgxNDFhYzA3YTc3OTQ3NGNiNTYzNjNiMzM5NzYxYzYxZjNkYzA2YzM4ODMyZWY3NjkwMTY5Y2UyNWJhODkzYmM0IiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
+                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4NUVkZmY4MkYwRTdEQzI1OTY4Y2JhOEI2MTRiZURENzgyYWMyY0VERCIsInRyYW5zYWN0aW9uIjoiMHgzZTBjMDc0YTBlOTlhOTQzNTNlMzZhZmVlYjkyNTdmNDhlMWEwNjQ4YzhkYThjZDg4ZDQzZGRhNDY2OWViY2MxIiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
               }
             }
           },
@@ -1021,8 +1021,8 @@
                 "swap": {
                   "summary": "swap",
                   "value": {
-                    "quoteId": "q_b9607a3beeb5d2c4",
-                    "taker": "0xC9624D25851d41033157AEd57Ed115D2d2D23fd0"
+                    "quoteId": "q_41e80c4162c5b22c",
+                    "taker": "0x8c1ACa7c080EcBbA92959b64230b8017Eb7a2a56"
                   }
                 }
               }
@@ -1041,9 +1041,9 @@
                   "swap": {
                     "summary": "swap",
                     "value": {
-                      "quoteId": "q_b9607a3beeb5d2c4",
+                      "quoteId": "q_41e80c4162c5b22c",
                       "block": 23584091,
-                      "expiresAt": "2026-10-07T20:14:28.000Z",
+                      "expiresAt": "2026-10-07T21:03:10.000Z",
                       "signatures": [
                         {
                           "kind": "permit2",
@@ -1092,11 +1092,11 @@
                               "details": {
                                 "token": "0x3600000000000000000000000000000000000000",
                                 "amount": "100000000",
-                                "expiration": "1793996008",
+                                "expiration": "1793998930",
                                 "nonce": "0"
                               },
                               "spender": "0x6cf4f7785d479b9ec1c3abe2fb569525380baede",
-                              "sigDeadline": "1791404068"
+                              "sigDeadline": "1791406990"
                             }
                           }
                         }
@@ -1111,7 +1111,7 @@
                         },
                         {
                           "to": "0x6cf4f7785d479b9ec1c3abe2fb569525380baede",
-                          "data": "0xfdbcb69200000000000000000000000036000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5e100000000000000000000000000128cc466b61f542da60c70e3aa11c10e19b84edb00000000000000000000000000000000000000000000000000836a511d2d0b7a000000000000000000000000c9624d25851d41033157aed57ed115d2d2d23fd0000000000000000000000000000000000000000000000000000000006ac6a824000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000006400000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000002a000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000171a4217b86a807a64eb94757db6849fb4bdbaa00000000000000000000000000000000000000000000000000000000005f5e1000000000000000000000000000000000000000000000000000000000005f5e100000000000000000000000000000000000000000000000000000000000001cd5d00000000000000000000000053bf6b0684ec7ef91e1387da3d1a1769bc5a6f7700000000000000000000000036000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008400000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000e404e45aaf0000000000000000000000003600000000000000000000000000000000000000000000000000000000000000171a4217b86a807a64eb94757db6849fb4bdbaa000000000000000000000000000000000000000000000000000000000000000640000000000000000000000006cf4f7785d479b9ec1c3abe2fb569525380baede7fffffffffffffffffffffffffffffffffffffffffffffffffffffffa3a3a3a4000000000000000000000000000000000000000000000000000000000001cd5d00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000128cc466b61f542da60c70e3aa11c10e19b84edb000000000000000000000000000000000000000000000000000000000001d207000000000000000000000000000000000000000000000000000000000001d20700000000000000000000000000000000000000000000000000836a511d2d0b7a00000000000000000000000057025fb592d9832b05d11097058c475b3ed97421000000000000000000000000171a4217b86a807a64eb94757db6849fb4bdbaa0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a400000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000104a026383e000000000000000000000000171a4217b86a807a64eb94757db6849fb4bdbaa0000000000000000000000000128cc466b61f542da60c70e3aa11c10e19b84edb000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000006cf4f7785d479b9ec1c3abe2fb569525380baede000000000000000000000000000000000000000000000000000000006ac6a8247fffffffffffffffffffffffffffffffffffffffffffffffffffffffa3a3a3a400000000000000000000000000000000000000000000000000836a511d2d0b7a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000",
+                          "data": "0xfdbcb69200000000000000000000000036000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5e100000000000000000000000000128cc466b61f542da60c70e3aa11c10e19b84edb00000000000000000000000000000000000000000000000000836a511d2d0b7a0000000000000000000000008c1aca7c080ecbba92959b64230b8017eb7a2a56000000000000000000000000000000000000000000000000000000006ac6b38e000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000006400000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000002a000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000171a4217b86a807a64eb94757db6849fb4bdbaa00000000000000000000000000000000000000000000000000000000005f5e1000000000000000000000000000000000000000000000000000000000005f5e100000000000000000000000000000000000000000000000000000000000001cd5d00000000000000000000000053bf6b0684ec7ef91e1387da3d1a1769bc5a6f7700000000000000000000000036000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008400000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000e404e45aaf0000000000000000000000003600000000000000000000000000000000000000000000000000000000000000171a4217b86a807a64eb94757db6849fb4bdbaa000000000000000000000000000000000000000000000000000000000000000640000000000000000000000006cf4f7785d479b9ec1c3abe2fb569525380baede7fffffffffffffffffffffffffffffffffffffffffffffffffffffffa3a3a3a4000000000000000000000000000000000000000000000000000000000001cd5d00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000128cc466b61f542da60c70e3aa11c10e19b84edb000000000000000000000000000000000000000000000000000000000001d207000000000000000000000000000000000000000000000000000000000001d20700000000000000000000000000000000000000000000000000836a511d2d0b7a00000000000000000000000057025fb592d9832b05d11097058c475b3ed97421000000000000000000000000171a4217b86a807a64eb94757db6849fb4bdbaa0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a400000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000104a026383e000000000000000000000000171a4217b86a807a64eb94757db6849fb4bdbaa0000000000000000000000000128cc466b61f542da60c70e3aa11c10e19b84edb000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000006cf4f7785d479b9ec1c3abe2fb569525380baede000000000000000000000000000000000000000000000000000000006ac6b38e7fffffffffffffffffffffffffffffffffffffffffffffffffffffffa3a3a3a400000000000000000000000000000000000000000000000000836a511d2d0b7a000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000",
                           "value": "0",
                           "gas": "884145",
                           "purpose": "swap"
@@ -1119,7 +1119,7 @@
                       ],
                       "amountOutSimulated": "37363756124729788",
                       "minAmountOut": "36990118563482490",
-                      "recipient": "0xc9624d25851d41033157aed57ed115d2d2d23fd0",
+                      "recipient": "0x8c1aca7c080ecbba92959b64230b8017eb7a2a56",
                       "safety": {
                         "verdict": "pinned",
                         "scope": {
@@ -1149,7 +1149,7 @@
                     "$ref": "#/components/schemas/SettleResponse"
                   }
                 },
-                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4NUVkZmY4MkYwRTdEQzI1OTY4Y2JhOEI2MTRiZURENzgyYWMyY0VERCIsInRyYW5zYWN0aW9uIjoiMHg0MjZmMzJiN2ViNjJhY2ZiY2RkZWM4YmUxODgzYzkzNWQwOWE1ZDkyYjMxYzc1ZTcwMDk0MTIwYzEwNWIzY2RmIiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
+                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4NUVkZmY4MkYwRTdEQzI1OTY4Y2JhOEI2MTRiZURENzgyYWMyY0VERCIsInRyYW5zYWN0aW9uIjoiMHhmNTE3NzM4YmIwYjkxMTJhZmI5MDJiNGZjZTE3NDgzYjc3ODk3ZTQ5ZTcyNDg5MGFlNzQ0ZTFkOWY4NjViYjZiIiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
               }
             }
           },
@@ -1229,10 +1229,10 @@
                         "message": "the quote has expired"
                       },
                       "quote": {
-                        "quoteId": "q_ed433d93a963e5a1",
+                        "quoteId": "q_91756d7b9daf70fa",
                         "network": "eip155:5042",
                         "block": 23584091,
-                        "expiresAt": "2026-10-07T20:15:42.334Z",
+                        "expiresAt": "2026-10-07T21:04:20.967Z",
                         "side": "exactIn",
                         "sell": {
                           "address": "0x3600000000000000000000000000000000000000",
@@ -1348,14 +1348,14 @@
                             "block": 23584091,
                             "walletProfile": "fresh_eoa",
                             "sellDelaySec": null,
-                            "tokenAgeSec": 9771673
+                            "tokenAgeSec": 9774591
                           },
                           "note": "Both endpoints are pinned assets; graph delivery was measured at the quote block."
                         },
                         "warnings": [],
                         "attestation": null,
                         "readiness": {
-                          "taker": "0xc9624d25851d41033157aed57ed115d2d2d23fd0",
+                          "taker": "0x8c1aca7c080ecbba92959b64230b8017eb7a2a56",
                           "balance": {
                             "token": "0x3600000000000000000000000000000000000000",
                             "required": "100000000",
@@ -1530,14 +1530,14 @@
                   "the permit embedded": {
                     "summary": "the permit embedded",
                     "value": {
-                      "quoteId": "q_322cb1a4e15c7d10",
+                      "quoteId": "q_284fd5edfa70cbd0",
                       "block": 15,
-                      "expiresAt": "2026-10-07T20:14:50.000Z",
+                      "expiresAt": "2026-10-07T21:03:32.000Z",
                       "signatures": [],
                       "transactions": [
                         {
                           "to": "0x6cf4f7785d479b9ec1c3abe2fb569525380baede",
-                          "data": "0xfdbcb69200000000000000000000000036000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5e100000000000000000000000000171a4217b86a807a64eb94757db6849fb4bdbaa0000000000000000000000000000000000000000000000000000000000001cd58000000000000000000000000333503752b0a9d7894093a5701f94b96ec37ccda000000000000000000000000000000000000000000000000000000006ac6a83a000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000003a00000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000171a4217b86a807a64eb94757db6849fb4bdbaa00000000000000000000000000000000000000000000000000000000005f5e1000000000000000000000000000000000000000000000000000000000005f5e100000000000000000000000000000000000000000000000000000000000001cd5800000000000000000000000053bf6b0684ec7ef91e1387da3d1a1769bc5a6f7700000000000000000000000036000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008400000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000e404e45aaf0000000000000000000000003600000000000000000000000000000000000000000000000000000000000000171a4217b86a807a64eb94757db6849fb4bdbaa000000000000000000000000000000000000000000000000000000000000000640000000000000000000000006cf4f7785d479b9ec1c3abe2fb569525380baede7fffffffffffffffffffffffffffffffffffffffffffffffffffffffa3a3a3a4000000000000000000000000000000000000000000000000000000000001cd58000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000036000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5e100000000000000000000000000000000000000000000000000000000006aee34fe00000000000000000000000000000000000000000000000000000000000000020000000000000000000000006cf4f7785d479b9ec1c3abe2fb569525380baede000000000000000000000000000000000000000000000000000000006ac6a83a00000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000041df1519a45b24d3e8d98c2a895ed77eb430c8f4b40835b64bb4588b1d9f68f47b5399da80a71fac6fd7ac254fbab82becc2a1c92aa32c93d2c7677f3b92b938891c00000000000000000000000000000000000000000000000000000000000000",
+                          "data": "0xfdbcb69200000000000000000000000036000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5e100000000000000000000000000171a4217b86a807a64eb94757db6849fb4bdbaa0000000000000000000000000000000000000000000000000000000000001cd580000000000000000000000007cb4c741f3f4fa7e03ff67be4119970b54909710000000000000000000000000000000000000000000000000000000006ac6b3a4000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000003a00000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000171a4217b86a807a64eb94757db6849fb4bdbaa00000000000000000000000000000000000000000000000000000000005f5e1000000000000000000000000000000000000000000000000000000000005f5e100000000000000000000000000000000000000000000000000000000000001cd5800000000000000000000000053bf6b0684ec7ef91e1387da3d1a1769bc5a6f7700000000000000000000000036000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000008400000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000e404e45aaf0000000000000000000000003600000000000000000000000000000000000000000000000000000000000000171a4217b86a807a64eb94757db6849fb4bdbaa000000000000000000000000000000000000000000000000000000000000000640000000000000000000000006cf4f7785d479b9ec1c3abe2fb569525380baede7fffffffffffffffffffffffffffffffffffffffffffffffffffffffa3a3a3a4000000000000000000000000000000000000000000000000000000000001cd58000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000036000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005f5e100000000000000000000000000000000000000000000000000000000006aee406800000000000000000000000000000000000000000000000000000000000000020000000000000000000000006cf4f7785d479b9ec1c3abe2fb569525380baede000000000000000000000000000000000000000000000000000000006ac6b3a4000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000418672e9419ac2513f43fa96c9da0c8fea9922cd16376554d7966e0fe23ed9127f255021411d371a07aa25c67ce0a32cd1baf9467c5b75185a16987a91996a69a41b00000000000000000000000000000000000000000000000000000000000000",
                           "value": "0",
                           "gas": "315651",
                           "purpose": "swap"
@@ -1545,7 +1545,7 @@
                       ],
                       "amountOutSimulated": "119297",
                       "minAmountOut": "118104",
-                      "recipient": "0x333503752b0a9d7894093a5701f94b96ec37ccda",
+                      "recipient": "0x7cb4c741f3f4fa7e03ff67be4119970b54909710",
                       "safety": {
                         "verdict": "pinned",
                         "scope": {
@@ -1555,8 +1555,8 @@
                       },
                       "attestation": {
                         "type": "eip712",
-                        "signer": "0x94aedf74c501e706894fb7414697221be59b6fdd",
-                        "signature": "0xcb4bddfaedf8281ff4accc57fbbf2f73a25a4c0d16b6c3f182ee065bdb6891c314939f6c47e7672b9d9ef5470954780015c2d426fc956157ea615f3fe1b4622c1c"
+                        "signer": "0x8714d8c3427bb08c207a4f21d151ebd86d3032f1",
+                        "signature": "0xa2d57062ba1c7b974aaf830163afe4f9454a36b6170741dfa43410e9ba66a771443817ae7f0ab86a3b0e701999ba734c613fbd8e2f527dc094d2d1b8a4d05cc61c"
                       },
                       "warnings": [],
                       "next": "send"
@@ -1752,16 +1752,16 @@
                   "a filled swap": {
                     "summary": "a filled swap",
                     "value": {
-                      "quoteId": "q_322cb1a4e15c7d10",
+                      "quoteId": "q_284fd5edfa70cbd0",
                       "result": "pass",
                       "token": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
-                      "recipient": "0x333503752b0a9d7894093a5701f94b96ec37ccda",
+                      "recipient": "0x7cb4c741f3f4fa7e03ff67be4119970b54909710",
                       "minAmountOut": "118104",
                       "delivered": "119297",
                       "block": 16,
                       "transactions": [
                         {
-                          "hash": "0x0ebc59d02b77e31cb57e813f87364ff97c81be8804baf2d76e1c95b4aaa90744",
+                          "hash": "0x233fef9de38627b7e4442d607f2f22f2ef17046499b07f90930448036cd5473c",
                           "purpose": "swap",
                           "status": "success",
                           "block": 16
@@ -2270,7 +2270,7 @@
                         "content": [
                           {
                             "type": "text",
-                            "text": "{\"ok\":true,\"db\":{\"ok\":true,\"tokens\":6,\"verified\":1,\"importedAt\":1791404038},\"rulesVersion\":\"r2-383954828c\",\"commit\":null,\"caches\":{\"response\":{\"hits\":0,\"misses\":4,\"size\":1,\"bytes\":2176},\"candidates\":{\"hits\":1,\"misses\":1,\"size\":1,\"bytes\":2989},\"generations\":{\"keys\":5,\"bumps\":212},\"abuse\":{\"missCacheSize\":0,\"payersTracked\":0,\"rateLimited\":0},\"singleflight\":{\"response\":{\"hits\":0,\"leaders\":2},\"probe\":{\"hits\":0,\"leaders\":0},\"depth\":{\"hits\":0,\"leaders\":2}},\"quote\":{\"lastEthCalls\":1,\"lastSafetyEthCalls\":0,\"lastCollapsed\":false}},\"rpc\":{\"counts\":{\"local_smoke:eth_getCode\":11,\"local_smoke:eth_getBlockByNumber\":28,\"local_smoke:eth_call\":64,\"local_smoke:eth_simulateV1\":62,\"local_smoke:eth_getTransactionByHash\":11,\"local_smoke:eth_getTransactionReceipt\":11,\"local_smoke:eth_blockNumber\":5,\"local_smoke:eth_getLogs\":33},\"total\":225,\"endpoints\":[{\"id\":\"local_smoke\",\"health\":1,\"circuit\":\"closed\",\"circuits\":{\"logs\":\"closed\",\"call\":\"closed\",\"archive\":\"closed\",\"simulate\":\"closed\",\"probe\":\"closed\"},\"weight\":100,\"priority\":1,\"capabilities\":[\"logs\",\"call\",\"archive\",\"simulate\",\"probe\",\"backfill\"],\"calls\":225,\"budget\":{\"used\":225,\"limit\":null,\"pct\":0,\"state\":\"ok\"},\"byCapability\":{\"logs\":{\"used\":33,\"limit\":null,\"reserveMonthly\":null,\"spillover\":false},\"call\":{\"used\":110,\"limit\":null,\"reserveMonthly\":null,\"spillover\":false},\"simulate\":{\"used\":82,\"limit\":null,\"reserveMonthly\":null,\"spillover\":false}},\"queue\":{\"waiting\":0,\"max\":20000,\"rejected\":0}}]},\"spend\":{\"counts\":{\"local_smoke:eth_getCode\":11,\"local_smoke:eth_getBlockByNumber\":28,\"local_smoke:eth_call\":64,\"local_smoke:eth_simulateV1\":62,\"local_smoke:eth_getTransactionByHash\":11,\"local_smoke:eth_getTransactionReceipt\":11,\"local_smoke:eth_blockNumber\":5,\"local_smoke:eth_getLogs\":33},\"month\":[{\"provider\":\"local_smoke\",\"method\":\"eth_getCode\",\"month\":\"2026-10\",\"calls\":11},{\"provider\":\"local_smoke\",\"method\":\"eth_getBlockByNumber\",\"month\":\"2026-10\",\"calls\":28},{\"provider\":\"local_smoke\",\"method\":\"eth_call\",\"month\":\"2026-10\",\"calls\":64},{\"provider\":\"local_smoke\",\"method\":\"eth_simulateV1\",\"month\":\"2026-10\",\"calls\":62},{\"provider\":\"local_smoke\",\"method\":\"eth_getTransactionByHash\",\"month\":\"2026-10\",\"calls\":11},{\"provider\":\"local_smoke\",\"method\":\"eth_getTransactionReceipt\",\"month\":\"2026-10\",\"calls\":11},{\"provider\":\"local_smoke\",\"method\":\"eth_blockNumber\",\"month\":\"2026-10\",\"calls\":5},{\"provider\":\"local_smoke\",\"method\":\"eth_getLogs\",\"month\":\"2026-10\",\"calls\":33}],\"budgets\":{\"local_smoke\":{\"used\":225,\"limit\":null,\"pct\":0,\"state\":\"ok\"}}},\"indexer\":{\"head\":24,\"streams\":[{\"stream\":\"poll:a:v4\",\"nextBlock\":23,\"lag\":2},{\"stream\":\"poll:b:v3v2tax\",\"nextBlock\":23,\"lag\":2},{\"stream\":\"poll:c:launchpads\",\"nextBlock\":23,\"lag\":2},{\"stream\":\"poll:d:milestones\",\"nextBlock\":23,\"lag\":2},{\"stream\":\"poll:f:aerodrome\",\"nextBlock\":23,\"lag\":2}],\"lastPollAt\":1791404038,\"backfill\":[{\"stream\":\"v4:pm:history\",\"nextBlock\":1948056,\"remainingBlocks\":0,\"blocksPerSec\":0,\"backoffUntil\":null},{\"stream\":\"uniswap_v3:backfill\",\"nextBlock\":1948019,\"remainingBlocks\":0,\"blocksPerSec\":0,\"backoffUntil\":null},{\"stream\":\"uniswap_v2:backfill\",\"nextBlock\":1948011,\"remainingBlocks\":0,\"blocksPerSec\":0,\"backoffUntil\":null},{\"stream\":\"aerodrome_cl:backfill\",\"nextBlock\":20968879,\"remainingBlocks\":0,\"blocksPerSec\":0,\"backoffUntil\":null},{\"stream\":\"argus:backfill\",\"nextBlock\":19674154,\"remainingBlocks\":0,\"blocksPerSec\":0,\"backoffUntil\":null},{\"stream\":\"o1:backfill\",\"nextBlock\":20147792,\"remainingBlocks\":0,\"blocksPerSec\":0,\"backoffUntil\":null},{\"stream\":\"minara:backfill\",\"nextBlock\":20925233,\"remainingBlocks\":0,\"blocksPerSec\":0,\"backoffUntil\":null},{\"stream\":\"tolly:backfill\",\"nextBlock\":13570649,\"remainingBlocks\":0,\"blocksPerSec\":0,\"backoffUntil\":null},{\"stream\":\"foci:backfill\",\"nextBlock\":20884011,\"remainingBlocks\":0,\"blocksPerSec\":0,\"backoffUntil\":null},{\"stream\":\"agents:registries\",\"nextBlock\":23,\"remainingBlocks\":1,\"blocksPerSec\":1398.6439680515716,\"backoffUntil\":null}],\"tradesRows\":6,\"lagBlocks\":2,\"caughtUp\":true,\"lastError\":null,\"consecutiveFailures\":0,\"maxTxMs\":1.473958999999013,\"maxBlockingMs\":1.5718340000003082,\"maxAggregateMs\":63.644624999998996},\"safety\":{\"enqueued\":4},\"payerIdentity\":\"x402\",\"x402\":{\"enabled\":true,\"network\":\"eip155:5042002\"}}"
+                            "text": "{\"ok\":true,\"db\":{\"ok\":true,\"tokens\":6,\"verified\":1,\"importedAt\":1791406960},\"rulesVersion\":\"r2-383954828c\",\"commit\":null,\"caches\":{\"response\":{\"hits\":0,\"misses\":4,\"size\":1,\"bytes\":2176},\"candidates\":{\"hits\":1,\"misses\":1,\"size\":1,\"bytes\":2989},\"generations\":{\"keys\":5,\"bumps\":202},\"abuse\":{\"missCacheSize\":0,\"payersTracked\":0,\"rateLimited\":0},\"singleflight\":{\"response\":{\"hits\":0,\"leaders\":2},\"probe\":{\"hits\":0,\"leaders\":0},\"depth\":{\"hits\":0,\"leaders\":2}},\"quote\":{\"lastEthCalls\":1,\"lastSafetyEthCalls\":0,\"lastCollapsed\":false}},\"rpc\":{\"counts\":{\"local_smoke:eth_getCode\":11,\"local_smoke:eth_getBlockByNumber\":28,\"local_smoke:eth_call\":60,\"local_smoke:eth_simulateV1\":62,\"local_smoke:eth_getTransactionByHash\":11,\"local_smoke:eth_getTransactionReceipt\":11,\"local_smoke:eth_blockNumber\":6,\"local_smoke:eth_getLogs\":40},\"total\":229,\"endpoints\":[{\"id\":\"local_smoke\",\"health\":1,\"circuit\":\"closed\",\"circuits\":{\"logs\":\"closed\",\"call\":\"closed\",\"archive\":\"closed\",\"simulate\":\"closed\",\"probe\":\"closed\"},\"weight\":100,\"priority\":1,\"capabilities\":[\"logs\",\"call\",\"archive\",\"simulate\",\"probe\",\"backfill\"],\"calls\":229,\"budget\":{\"used\":229,\"limit\":null,\"pct\":0,\"state\":\"ok\"},\"byCapability\":{\"logs\":{\"used\":40,\"limit\":null,\"reserveMonthly\":null,\"spillover\":false},\"call\":{\"used\":107,\"limit\":null,\"reserveMonthly\":null,\"spillover\":false},\"simulate\":{\"used\":82,\"limit\":null,\"reserveMonthly\":null,\"spillover\":false}},\"queue\":{\"waiting\":0,\"max\":20000,\"rejected\":0}}]},\"spend\":{\"counts\":{\"local_smoke:eth_getCode\":11,\"local_smoke:eth_getBlockByNumber\":28,\"local_smoke:eth_call\":60,\"local_smoke:eth_simulateV1\":62,\"local_smoke:eth_getTransactionByHash\":11,\"local_smoke:eth_getTransactionReceipt\":11,\"local_smoke:eth_blockNumber\":6,\"local_smoke:eth_getLogs\":40},\"month\":[{\"provider\":\"local_smoke\",\"method\":\"eth_getCode\",\"month\":\"2026-10\",\"calls\":11},{\"provider\":\"local_smoke\",\"method\":\"eth_getBlockByNumber\",\"month\":\"2026-10\",\"calls\":28},{\"provider\":\"local_smoke\",\"method\":\"eth_call\",\"month\":\"2026-10\",\"calls\":60},{\"provider\":\"local_smoke\",\"method\":\"eth_simulateV1\",\"month\":\"2026-10\",\"calls\":62},{\"provider\":\"local_smoke\",\"method\":\"eth_getTransactionByHash\",\"month\":\"2026-10\",\"calls\":11},{\"provider\":\"local_smoke\",\"method\":\"eth_getTransactionReceipt\",\"month\":\"2026-10\",\"calls\":11},{\"provider\":\"local_smoke\",\"method\":\"eth_blockNumber\",\"month\":\"2026-10\",\"calls\":6},{\"provider\":\"local_smoke\",\"method\":\"eth_getLogs\",\"month\":\"2026-10\",\"calls\":40}],\"budgets\":{\"local_smoke\":{\"used\":229,\"limit\":null,\"pct\":0,\"state\":\"ok\"}}},\"indexer\":{\"head\":24,\"streams\":[{\"stream\":\"poll:a:v4\",\"nextBlock\":23,\"lag\":2},{\"stream\":\"poll:b:v3v2tax\",\"nextBlock\":23,\"lag\":2},{\"stream\":\"poll:c:launchpads\",\"nextBlock\":23,\"lag\":2},{\"stream\":\"poll:d:milestones\",\"nextBlock\":23,\"lag\":2},{\"stream\":\"poll:f:aerodrome\",\"nextBlock\":23,\"lag\":2}],\"lastPollAt\":1791406960,\"backfill\":[{\"stream\":\"v4:pm:history\",\"nextBlock\":1948056,\"remainingBlocks\":0,\"blocksPerSec\":0,\"backoffUntil\":null},{\"stream\":\"uniswap_v3:backfill\",\"nextBlock\":1948019,\"remainingBlocks\":0,\"blocksPerSec\":0,\"backoffUntil\":null},{\"stream\":\"uniswap_v2:backfill\",\"nextBlock\":1948011,\"remainingBlocks\":0,\"blocksPerSec\":0,\"backoffUntil\":null},{\"stream\":\"aerodrome_cl:backfill\",\"nextBlock\":20968879,\"remainingBlocks\":0,\"blocksPerSec\":0,\"backoffUntil\":null},{\"stream\":\"argus:backfill\",\"nextBlock\":19674154,\"remainingBlocks\":0,\"blocksPerSec\":0,\"backoffUntil\":null},{\"stream\":\"o1:backfill\",\"nextBlock\":20147792,\"remainingBlocks\":0,\"blocksPerSec\":0,\"backoffUntil\":null},{\"stream\":\"minara:backfill\",\"nextBlock\":20925233,\"remainingBlocks\":0,\"blocksPerSec\":0,\"backoffUntil\":null},{\"stream\":\"tolly:backfill\",\"nextBlock\":13570649,\"remainingBlocks\":0,\"blocksPerSec\":0,\"backoffUntil\":null},{\"stream\":\"foci:backfill\",\"nextBlock\":20884011,\"remainingBlocks\":0,\"blocksPerSec\":0,\"backoffUntil\":null},{\"stream\":\"agents:registries\",\"nextBlock\":23,\"remainingBlocks\":1,\"blocksPerSec\":913.4240583805351,\"backoffUntil\":null}],\"tradesRows\":6,\"lagBlocks\":2,\"caughtUp\":true,\"lastError\":null,\"consecutiveFailures\":0,\"maxTxMs\":1.2456249999995634,\"maxBlockingMs\":1.955540999999812,\"maxAggregateMs\":69.61583299999984},\"safety\":{\"enqueued\":4},\"payerIdentity\":\"x402\",\"x402\":{\"enabled\":true,\"network\":\"eip155:5042002\"}}"
                           }
                         ],
                         "structuredContent": {
@@ -2279,7 +2279,7 @@
                             "ok": true,
                             "tokens": 6,
                             "verified": 1,
-                            "importedAt": 1791404038
+                            "importedAt": 1791406960
                           },
                           "rulesVersion": "r2-383954828c",
                           "commit": null,
@@ -2298,7 +2298,7 @@
                             },
                             "generations": {
                               "keys": 5,
-                              "bumps": 212
+                              "bumps": 202
                             },
                             "abuse": {
                               "missCacheSize": 0,
@@ -2329,14 +2329,14 @@
                             "counts": {
                               "local_smoke:eth_getCode": 11,
                               "local_smoke:eth_getBlockByNumber": 28,
-                              "local_smoke:eth_call": 64,
+                              "local_smoke:eth_call": 60,
                               "local_smoke:eth_simulateV1": 62,
                               "local_smoke:eth_getTransactionByHash": 11,
                               "local_smoke:eth_getTransactionReceipt": 11,
-                              "local_smoke:eth_blockNumber": 5,
-                              "local_smoke:eth_getLogs": 33
+                              "local_smoke:eth_blockNumber": 6,
+                              "local_smoke:eth_getLogs": 40
                             },
-                            "total": 225,
+                            "total": 229,
                             "endpoints": [
                               {
                                 "id": "local_smoke",
@@ -2359,22 +2359,22 @@
                                   "probe",
                                   "backfill"
                                 ],
-                                "calls": 225,
+                                "calls": 229,
                                 "budget": {
-                                  "used": 225,
+                                  "used": 229,
                                   "limit": null,
                                   "pct": 0,
                                   "state": "ok"
                                 },
                                 "byCapability": {
                                   "logs": {
-                                    "used": 33,
+                                    "used": 40,
                                     "limit": null,
                                     "reserveMonthly": null,
                                     "spillover": false
                                   },
                                   "call": {
-                                    "used": 110,
+                                    "used": 107,
                                     "limit": null,
                                     "reserveMonthly": null,
                                     "spillover": false
@@ -2398,12 +2398,12 @@
                             "counts": {
                               "local_smoke:eth_getCode": 11,
                               "local_smoke:eth_getBlockByNumber": 28,
-                              "local_smoke:eth_call": 64,
+                              "local_smoke:eth_call": 60,
                               "local_smoke:eth_simulateV1": 62,
                               "local_smoke:eth_getTransactionByHash": 11,
                               "local_smoke:eth_getTransactionReceipt": 11,
-                              "local_smoke:eth_blockNumber": 5,
-                              "local_smoke:eth_getLogs": 33
+                              "local_smoke:eth_blockNumber": 6,
+                              "local_smoke:eth_getLogs": 40
                             },
                             "month": [
                               {
@@ -2422,7 +2422,7 @@
                                 "provider": "local_smoke",
                                 "method": "eth_call",
                                 "month": "2026-10",
-                                "calls": 64
+                                "calls": 60
                               },
                               {
                                 "provider": "local_smoke",
@@ -2446,18 +2446,18 @@
                                 "provider": "local_smoke",
                                 "method": "eth_blockNumber",
                                 "month": "2026-10",
-                                "calls": 5
+                                "calls": 6
                               },
                               {
                                 "provider": "local_smoke",
                                 "method": "eth_getLogs",
                                 "month": "2026-10",
-                                "calls": 33
+                                "calls": 40
                               }
                             ],
                             "budgets": {
                               "local_smoke": {
-                                "used": 225,
+                                "used": 229,
                                 "limit": null,
                                 "pct": 0,
                                 "state": "ok"
@@ -2493,7 +2493,7 @@
                                 "lag": 2
                               }
                             ],
-                            "lastPollAt": 1791404038,
+                            "lastPollAt": 1791406960,
                             "backfill": [
                               {
                                 "stream": "v4:pm:history",
@@ -2562,7 +2562,7 @@
                                 "stream": "agents:registries",
                                 "nextBlock": 23,
                                 "remainingBlocks": 1,
-                                "blocksPerSec": 1398.6439680515716,
+                                "blocksPerSec": 913.4240583805351,
                                 "backoffUntil": null
                               }
                             ],
@@ -2571,9 +2571,9 @@
                             "caughtUp": true,
                             "lastError": null,
                             "consecutiveFailures": 0,
-                            "maxTxMs": 1.473958999999013,
-                            "maxBlockingMs": 1.5718340000003082,
-                            "maxAggregateMs": 63.644624999998996
+                            "maxTxMs": 1.2456249999995634,
+                            "maxBlockingMs": 1.955540999999812,
+                            "maxAggregateMs": 69.61583299999984
                           },
                           "safety": {
                             "enqueued": 4
@@ -2901,7 +2901,7 @@
                     "$ref": "#/components/schemas/SettleResponse"
                   }
                 },
-                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4Yjk2OUUxODgxNWRhZkREMkY4YjdFODNmMjEzM0NhQTRDY0RDMTc0MSIsInRyYW5zYWN0aW9uIjoiMHg5YTlhNzE2OTg5MGJmNTE3ZDJjNDgzN2FmYzY5ZWU0MDdhNTE0YWI3MWM3OWFiYTMzZWUyZmQyZjZmMjRhY2RjIiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
+                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4OTY3NzNkOTZEZmJiMjE5Nzg1MzhFZmY0RjBBRWJGMjMyYzE3NTg1QiIsInRyYW5zYWN0aW9uIjoiMHg0ZTcyNTI1YmQwMGJjMjhhMTBkMTk4NTNiY2M5MzFjMGU0YjkwYmUwZTAwMDAyZDM0ZDJmNTg1NDcwOWU4NDliIiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
               }
             }
           },
@@ -3178,7 +3178,7 @@
                     "$ref": "#/components/schemas/SettleResponse"
                   }
                 },
-                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4Yjk2OUUxODgxNWRhZkREMkY4YjdFODNmMjEzM0NhQTRDY0RDMTc0MSIsInRyYW5zYWN0aW9uIjoiMHhjOThjYmFkODkxZmE1NWQ3OGZkYTljNGJkMDVhOTdkYWNiNzQzYzJmNGVjOTgyZTg1MzNiNjZhOTBiM2M3Y2UwIiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
+                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4OTY3NzNkOTZEZmJiMjE5Nzg1MzhFZmY0RjBBRWJGMjMyYzE3NTg1QiIsInRyYW5zYWN0aW9uIjoiMHgxYWYzYmM4NTYzMDQwMWQ1NTBkMjgwZmZlYTkwOGQ5NTY0MTViZGFjMjIzYzkxZjc3M2UyZTc3MTZlYWY2ZDBkIiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
               }
             }
           },
@@ -3379,7 +3379,7 @@
                     "$ref": "#/components/schemas/SettleResponse"
                   }
                 },
-                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4Yjk2OUUxODgxNWRhZkREMkY4YjdFODNmMjEzM0NhQTRDY0RDMTc0MSIsInRyYW5zYWN0aW9uIjoiMHgzODYwMmIyMmRkY2I2MjU1YzVmMzgyMzhiNTA4OTk4OTNkNzRlNWY4NTgyOWNjYmViNjU0NmEzNTBkZGEwYzg2IiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
+                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4OTY3NzNkOTZEZmJiMjE5Nzg1MzhFZmY0RjBBRWJGMjMyYzE3NTg1QiIsInRyYW5zYWN0aW9uIjoiMHg4YzNlMTQ5OTIxOTVlODBiMjFjNjYyOTBmNTY2OGVmOWIwNDY1ZDgzNGQzNTU3MDE0ZGMyNDZkYzJmYWNkMGMxIiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
               }
             }
           },
@@ -3516,14 +3516,14 @@
                   "a new box": {
                     "summary": "a new box",
                     "value": {
-                      "address": "0xb969e18815dafdd2f8b7e83f2133caa4ccdc1741",
+                      "address": "0x96773d96dfbb21978538eff4f0aebf232c17585b",
                       "granted": {
                         "messages": 8,
                         "days": 30
                       },
                       "allowance": {
                         "messagesLeft": 8,
-                        "expiresAt": 1793996028
+                        "expiresAt": 1793998947
                       }
                     }
                   }
@@ -3544,7 +3544,7 @@
                     "$ref": "#/components/schemas/SettleResponse"
                   }
                 },
-                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4Yjk2OUUxODgxNWRhZkREMkY4YjdFODNmMjEzM0NhQTRDY0RDMTc0MSIsInRyYW5zYWN0aW9uIjoiMHhhNGFjNzE5OTIzZDUzYmZkMzdiZDczNzk5ZjRlNWY5YzZiOTcyYzY0ZTIxYTE2NTZmNzk0N2JmODVhZTdiYzEzIiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
+                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4OTY3NzNkOTZEZmJiMjE5Nzg1MzhFZmY0RjBBRWJGMjMyYzE3NTg1QiIsInRyYW5zYWN0aW9uIjoiMHg2NDYyZjBjZTFkODEyNWZmNGEwODBkNTQzM2VlY2M0ZWNjOWRhMmZlMGFiNTk1YTJhODRkZjk3YTBiZTJjOTMwIiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
               }
             }
           },
@@ -3711,14 +3711,14 @@
                   "a top-up": {
                     "summary": "a top-up",
                     "value": {
-                      "address": "0xb969e18815dafdd2f8b7e83f2133caa4ccdc1741",
+                      "address": "0x96773d96dfbb21978538eff4f0aebf232c17585b",
                       "granted": {
                         "messages": 8,
                         "days": 0
                       },
                       "allowance": {
                         "messagesLeft": 15,
-                        "expiresAt": 1796588028
+                        "expiresAt": 1796590947
                       }
                     }
                   }
@@ -3739,7 +3739,7 @@
                     "$ref": "#/components/schemas/SettleResponse"
                   }
                 },
-                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4Yjk2OUUxODgxNWRhZkREMkY4YjdFODNmMjEzM0NhQTRDY0RDMTc0MSIsInRyYW5zYWN0aW9uIjoiMHg0YWJhYTE1MTA2ZGVlODViOGRjZjM1ZDdhODgxYTUwOTQ3MjVkODdhM2E3MzNjYWNmYWMyNTBlZmJjMDA2MTcxIiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
+                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4OTY3NzNkOTZEZmJiMjE5Nzg1MzhFZmY0RjBBRWJGMjMyYzE3NTg1QiIsInRyYW5zYWN0aW9uIjoiMHhmYmRlZjI3MTRkNzZjNGY0ZjFjMzJiMWQ0MGVhMTc0Y2E0ZDE5MDdiMGJiNzJkYmFjMjczOTRmNThjOGJhODBlIiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
               }
             }
           },
@@ -3901,11 +3901,11 @@
                   "a box with messages, watches and channels": {
                     "summary": "a box with messages, watches and channels",
                     "value": {
-                      "address": "0xb969e18815dafdd2f8b7e83f2133caa4ccdc1741",
-                      "createdAt": 1791404028,
+                      "address": "0x96773d96dfbb21978538eff4f0aebf232c17585b",
+                      "createdAt": 1791406947,
                       "allowance": {
                         "messagesLeft": 5,
-                        "expiresAt": 1793996028,
+                        "expiresAt": 1793998947,
                         "expired": false
                       },
                       "counts": {
@@ -4119,56 +4119,56 @@
                         {
                           "kind": "inbound",
                           "type": "inbound",
-                          "idempotencyKey": "0x44fe6bca3c63d847eef91c25ecae7db798c252bb7df2578211ad1afedf035b91",
-                          "box": "0xb969e18815dafdd2f8b7e83f2133caa4ccdc1741",
+                          "idempotencyKey": "0x734bb166a29a48a7852adccd55d03ce45762b50091e06f5f25e25f500067082e",
+                          "box": "0x96773d96dfbb21978538eff4f0aebf232c17585b",
                           "seq": 1,
-                          "createdAt": 1791404029,
-                          "expiresAt": 1794082429,
+                          "createdAt": 1791406948,
+                          "expiresAt": 1794085348,
                           "payload": {
                             "untrusted": true,
                             "contentType": "application/json",
                             "encoding": "utf8",
-                            "content": "{\"hello\":\"arcgate smoke\",\"run\":\"b7oe63pa\"}"
+                            "content": "{\"hello\":\"arcgate smoke\",\"run\":\"wxr28ezf\"}"
                           },
                           "source": {
-                            "inboundAddressId": "UkjZb7vqZDTrpOE4KUHIvg",
+                            "inboundAddressId": "ohKRSXa8hoa8bZyIQipm1A",
                             "signatureVerified": true
                           }
                         },
                         {
                           "kind": "watch",
                           "type": "watch.token",
-                          "idempotencyKey": "0xb843302728c40c84bcc8d0df45e909790f1cce818769cd6c15b62c1a5b9cc1cb",
-                          "box": "0xb969e18815dafdd2f8b7e83f2133caa4ccdc1741",
+                          "idempotencyKey": "0xa1e1bebb188133ad8b2c2a869bf0460b9a1cb1a80808870963de6b28dd9b8239",
+                          "box": "0x96773d96dfbb21978538eff4f0aebf232c17585b",
                           "seq": 2,
-                          "createdAt": 1791404029,
-                          "expiresAt": 1794082429,
+                          "createdAt": 1791406952,
+                          "expiresAt": 1794085352,
                           "payload": {
                             "untrusted": true,
                             "contentType": "application/json",
                             "encoding": "utf8",
-                            "content": "{\"watchId\":\"8XCkTdJYLJeJtZGQws1lRg\",\"condition\":{\"kind\":\"token\",\"token\":\"0x171a4217b86a807a64eb94757db6849fb4bdbaa0\",\"where\":[{\"field\":\"volume_24h\",\"op\":\"gt\",\"value\":1}]},\"changeId\":9,\"token\":\"0x171a4217b86a807a64eb94757db6849fb4bdbaa0\",\"symbol\":\"cirBTC\",\"observed\":{\"volume_24h\":100}}"
+                            "content": "{\"watchId\":\"R7Oj5C6wm-MrDW38aTrRew\",\"condition\":{\"kind\":\"token\",\"token\":\"0x171a4217b86a807a64eb94757db6849fb4bdbaa0\",\"where\":[{\"field\":\"volume_24h\",\"op\":\"gt\",\"value\":1}]},\"changeId\":10,\"token\":\"0x171a4217b86a807a64eb94757db6849fb4bdbaa0\",\"symbol\":\"cirBTC\",\"observed\":{\"volume_24h\":100}}"
                           },
                           "source": {
-                            "watchId": "8XCkTdJYLJeJtZGQws1lRg"
+                            "watchId": "R7Oj5C6wm-MrDW38aTrRew"
                           }
                         },
                         {
                           "kind": "watch",
                           "type": "watch.screen",
-                          "idempotencyKey": "0x17bb72b62642dfb932d0a2ad4a5538b0480ef6aaacb1718879badfd01374df67",
-                          "box": "0xb969e18815dafdd2f8b7e83f2133caa4ccdc1741",
+                          "idempotencyKey": "0x352cb254728b9c3aadf410ac0ed6d79bd0f819a892d1ff5ba43a7a3581f4f444",
+                          "box": "0x96773d96dfbb21978538eff4f0aebf232c17585b",
                           "seq": 3,
-                          "createdAt": 1791404029,
-                          "expiresAt": 1794082429,
+                          "createdAt": 1791406952,
+                          "expiresAt": 1794085352,
                           "payload": {
                             "untrusted": true,
                             "contentType": "application/json",
                             "encoding": "utf8",
-                            "content": "{\"watchId\":\"um1CCDabyBlnMz2Yv3KKLQ\",\"condition\":{\"kind\":\"screen\",\"where\":[{\"field\":\"volume_24h\",\"op\":\"gt\",\"value\":1}]},\"changeId\":9,\"token\":\"0x171a4217b86a807a64eb94757db6849fb4bdbaa0\",\"symbol\":\"cirBTC\",\"observed\":{\"volume_24h\":100}}"
+                            "content": "{\"watchId\":\"dnpOZpkwLCQSbv15V8n7ZQ\",\"condition\":{\"kind\":\"screen\",\"where\":[{\"field\":\"volume_24h\",\"op\":\"gt\",\"value\":1}]},\"changeId\":10,\"token\":\"0x171a4217b86a807a64eb94757db6849fb4bdbaa0\",\"symbol\":\"cirBTC\",\"observed\":{\"volume_24h\":100}}"
                           },
                           "source": {
-                            "watchId": "um1CCDabyBlnMz2Yv3KKLQ"
+                            "watchId": "dnpOZpkwLCQSbv15V8n7ZQ"
                           }
                         }
                       ],
@@ -4360,19 +4360,19 @@
                     "value": {
                       "kind": "watch",
                       "type": "watch.token",
-                      "idempotencyKey": "0xb843302728c40c84bcc8d0df45e909790f1cce818769cd6c15b62c1a5b9cc1cb",
-                      "box": "0xb969e18815dafdd2f8b7e83f2133caa4ccdc1741",
+                      "idempotencyKey": "0xa1e1bebb188133ad8b2c2a869bf0460b9a1cb1a80808870963de6b28dd9b8239",
+                      "box": "0x96773d96dfbb21978538eff4f0aebf232c17585b",
                       "seq": 2,
-                      "createdAt": 1791404029,
-                      "expiresAt": 1794082429,
+                      "createdAt": 1791406952,
+                      "expiresAt": 1794085352,
                       "payload": {
                         "untrusted": true,
                         "contentType": "application/json",
                         "encoding": "utf8",
-                        "content": "{\"watchId\":\"8XCkTdJYLJeJtZGQws1lRg\",\"condition\":{\"kind\":\"token\",\"token\":\"0x171a4217b86a807a64eb94757db6849fb4bdbaa0\",\"where\":[{\"field\":\"volume_24h\",\"op\":\"gt\",\"value\":1}]},\"changeId\":9,\"token\":\"0x171a4217b86a807a64eb94757db6849fb4bdbaa0\",\"symbol\":\"cirBTC\",\"observed\":{\"volume_24h\":100}}"
+                        "content": "{\"watchId\":\"R7Oj5C6wm-MrDW38aTrRew\",\"condition\":{\"kind\":\"token\",\"token\":\"0x171a4217b86a807a64eb94757db6849fb4bdbaa0\",\"where\":[{\"field\":\"volume_24h\",\"op\":\"gt\",\"value\":1}]},\"changeId\":10,\"token\":\"0x171a4217b86a807a64eb94757db6849fb4bdbaa0\",\"symbol\":\"cirBTC\",\"observed\":{\"volume_24h\":100}}"
                       },
                       "source": {
-                        "watchId": "8XCkTdJYLJeJtZGQws1lRg"
+                        "watchId": "R7Oj5C6wm-MrDW38aTrRew"
                       }
                     }
                   },
@@ -4381,19 +4381,19 @@
                     "value": {
                       "kind": "watch",
                       "type": "watch.agent",
-                      "idempotencyKey": "0xa5f9431c5c77aeb8ced170555ea0fd32bbba678afe67c7977c6af8885b5edd79",
-                      "box": "0xb969e18815dafdd2f8b7e83f2133caa4ccdc1741",
+                      "idempotencyKey": "0xcc580ad9950761b73260315c6e3262296b3df5bb25adbf401476f9a02dc4719a",
+                      "box": "0x96773d96dfbb21978538eff4f0aebf232c17585b",
                       "seq": 4,
-                      "createdAt": 1791404037,
-                      "expiresAt": 1794082437,
+                      "createdAt": 1791406958,
+                      "expiresAt": 1794085358,
                       "payload": {
                         "untrusted": true,
                         "contentType": "application/json",
                         "encoding": "utf8",
-                        "content": "{\"watchId\":\"0LNN3rHqWerNjltxArNeBQ\",\"condition\":{\"kind\":\"agents\",\"chainId\":5042,\"on\":[\"registered\"]},\"changeId\":20,\"chainId\":5042,\"agentId\":1360,\"change\":\"registered\",\"agent\":{\"agentId\":1360,\"owner\":\"0x6c4601283f1b115c34d3c6089a1df545fc90c08f\",\"agentWallet\":\"0x6c4601283f1b115c34d3c6089a1df545fc90c08f\",\"agentUri\":\"data:application/json;base64,eyJ0eXBlIjoiaHR0cHM6Ly9laXBzLmV0aGVyZXVtLm9yZy9FSVBTL2VpcC04MDA0I3JlZ2lzdHJhdGlvbi12MSIsIm5hbWUiOiJzbW9rZSBhZ2VudCBiN29lNjNwYSIsImRlc2NyaXB0aW9uIjoiUmVnaXN0ZXJlZCBieSB0aGUgbG9jYWwgc21va2UgcnVuLiIsInNlcnZpY2VzIjpbXSwieDQwMlN1cHBvcnQiOmZhbHNlLCJhY3RpdmUiOmZhbHNlLCJyZWdpc3RyYXRpb25zIjpbXSwic3VwcG9ydGVkVHJ1c3QiOltdfQ==\",\"fetchStatus\":\"fetched\",\"name\":\"smoke agent b7oe63pa\",\"description\":\"Registered by the local smoke run.\",\"protocols\":[],\"x402Support\":false,\"active\":false}}"
+                        "content": "{\"watchId\":\"NlynpExPP_LuzlCKIL7LEA\",\"condition\":{\"kind\":\"agents\",\"chainId\":5042,\"on\":[\"registered\"]},\"changeId\":20,\"chainId\":5042,\"agentId\":1360,\"change\":\"registered\",\"agent\":{\"agentId\":1360,\"owner\":\"0xcca5b038ea648fd165860fd39aaf5a3be11bbe02\",\"agentWallet\":\"0xcca5b038ea648fd165860fd39aaf5a3be11bbe02\",\"agentUri\":\"data:application/json;base64,eyJ0eXBlIjoiaHR0cHM6Ly9laXBzLmV0aGVyZXVtLm9yZy9FSVBTL2VpcC04MDA0I3JlZ2lzdHJhdGlvbi12MSIsIm5hbWUiOiJzbW9rZSBhZ2VudCB3eHIyOGV6ZiIsImRlc2NyaXB0aW9uIjoiUmVnaXN0ZXJlZCBieSB0aGUgbG9jYWwgc21va2UgcnVuLiIsInNlcnZpY2VzIjpbXSwieDQwMlN1cHBvcnQiOmZhbHNlLCJhY3RpdmUiOmZhbHNlLCJyZWdpc3RyYXRpb25zIjpbXSwic3VwcG9ydGVkVHJ1c3QiOltdfQ==\",\"fetchStatus\":\"fetched\",\"name\":\"smoke agent wxr28ezf\",\"description\":\"Registered by the local smoke run.\",\"protocols\":[],\"x402Support\":false,\"active\":false}}"
                       },
                       "source": {
-                        "watchId": "0LNN3rHqWerNjltxArNeBQ"
+                        "watchId": "NlynpExPP_LuzlCKIL7LEA"
                       }
                     }
                   }
@@ -4759,10 +4759,10 @@
                   "a new inbound address": {
                     "summary": "a new inbound address",
                     "value": {
-                      "id": "UkjZb7vqZDTrpOE4KUHIvg",
-                      "url": "https://in.arcgate.dev/UkjZb7vqZDTrpOE4KUHIvg",
-                      "secret": "Qzoofb2asYSdGWLuEm_MpUnC0pr1QRRid3Su9tuUe1k",
-                      "createdAt": 1791404029
+                      "id": "ohKRSXa8hoa8bZyIQipm1A",
+                      "url": "https://in.arcgate.dev/ohKRSXa8hoa8bZyIQipm1A",
+                      "secret": "fh9cDhynIFGlUXAL0ojDRPs_FQNlMhFbP1771U4z_WQ",
+                      "createdAt": 1791406948
                     }
                   }
                 }
@@ -4782,7 +4782,7 @@
                     "$ref": "#/components/schemas/SettleResponse"
                   }
                 },
-                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4Yjk2OUUxODgxNWRhZkREMkY4YjdFODNmMjEzM0NhQTRDY0RDMTc0MSIsInRyYW5zYWN0aW9uIjoiMHg3MjBiZjUxNjkwNDBhNmQ5OTZhNmRhNDNmODg5ODVhYjdmMTE0MjllZjZjNmM1MWJhODE5ZGY1MDVkZDNkODI0IiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
+                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4OTY3NzNkOTZEZmJiMjE5Nzg1MzhFZmY0RjBBRWJGMjMyYzE3NTg1QiIsInRyYW5zYWN0aW9uIjoiMHgyZGRjNmI2YzY3MDRmNTczMTE2NTgyNmM0MGYwMTk3Mzk5MjliNGUyODlmZGIxYjgzM2U0MDRkNWFiNWI0YjdmIiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
               }
             }
           },
@@ -4973,9 +4973,9 @@
                     "value": {
                       "addresses": [
                         {
-                          "id": "UkjZb7vqZDTrpOE4KUHIvg",
-                          "url": "https://in.arcgate.dev/UkjZb7vqZDTrpOE4KUHIvg",
-                          "createdAt": 1791404029
+                          "id": "ohKRSXa8hoa8bZyIQipm1A",
+                          "url": "https://in.arcgate.dev/ohKRSXa8hoa8bZyIQipm1A",
+                          "createdAt": 1791406948
                         }
                       ]
                     }
@@ -5164,7 +5164,7 @@
                     "summary": "a deleted inbound address",
                     "value": {
                       "deleted": true,
-                      "id": "UkjZb7vqZDTrpOE4KUHIvg"
+                      "id": "ohKRSXa8hoa8bZyIQipm1A"
                     }
                   }
                 }
@@ -5350,9 +5350,9 @@
                   "a rotated secret": {
                     "summary": "a rotated secret",
                     "value": {
-                      "id": "UkjZb7vqZDTrpOE4KUHIvg",
-                      "url": "https://in.arcgate.dev/UkjZb7vqZDTrpOE4KUHIvg",
-                      "secret": "Q423dDZp-3r7mNyLj096exlWQkfLNy2u36NtBt9UGPc"
+                      "id": "ohKRSXa8hoa8bZyIQipm1A",
+                      "url": "https://in.arcgate.dev/ohKRSXa8hoa8bZyIQipm1A",
+                      "secret": "Rq1_Pxth5-pMO5pemBUCAva1fojFh2g3oi379h-0kG0"
                     }
                   }
                 }
@@ -5619,7 +5619,7 @@
                   "a screen": {
                     "summary": "a screen",
                     "value": {
-                      "id": "um1CCDabyBlnMz2Yv3KKLQ",
+                      "id": "dnpOZpkwLCQSbv15V8n7ZQ",
                       "condition": {
                         "kind": "screen",
                         "where": [
@@ -5630,13 +5630,13 @@
                           }
                         ]
                       },
-                      "createdAt": 1791404029
+                      "createdAt": 1791406948
                     }
                   },
                   "an agent screen": {
                     "summary": "an agent screen",
                     "value": {
-                      "id": "0LNN3rHqWerNjltxArNeBQ",
+                      "id": "NlynpExPP_LuzlCKIL7LEA",
                       "condition": {
                         "kind": "agents",
                         "chainId": 5042,
@@ -5644,7 +5644,7 @@
                           "registered"
                         ]
                       },
-                      "createdAt": 1791404033
+                      "createdAt": 1791406956
                     }
                   },
                   "an agent watch": {
@@ -5886,7 +5886,7 @@
                     "value": {
                       "watches": [
                         {
-                          "id": "8XCkTdJYLJeJtZGQws1lRg",
+                          "id": "R7Oj5C6wm-MrDW38aTrRew",
                           "condition": {
                             "kind": "token",
                             "token": "0x171a4217b86a807a64eb94757db6849fb4bdbaa0",
@@ -5898,12 +5898,12 @@
                               }
                             ]
                           },
-                          "createdAt": 1791404029,
-                          "lastFiredAt": 1791404029,
+                          "createdAt": 1791406948,
+                          "lastFiredAt": 1791406952,
                           "matchingTokens": null
                         },
                         {
-                          "id": "um1CCDabyBlnMz2Yv3KKLQ",
+                          "id": "dnpOZpkwLCQSbv15V8n7ZQ",
                           "condition": {
                             "kind": "screen",
                             "where": [
@@ -5914,12 +5914,12 @@
                               }
                             ]
                           },
-                          "createdAt": 1791404029,
-                          "lastFiredAt": 1791404029,
+                          "createdAt": 1791406948,
+                          "lastFiredAt": 1791406952,
                           "matchingTokens": 1
                         },
                         {
-                          "id": "0LNN3rHqWerNjltxArNeBQ",
+                          "id": "NlynpExPP_LuzlCKIL7LEA",
                           "condition": {
                             "kind": "agents",
                             "chainId": 5042,
@@ -5927,8 +5927,8 @@
                               "registered"
                             ]
                           },
-                          "createdAt": 1791404033,
-                          "lastFiredAt": 1791404037,
+                          "createdAt": 1791406956,
+                          "lastFiredAt": 1791406958,
                           "matchingTokens": null
                         }
                       ]
@@ -6118,7 +6118,7 @@
                     "summary": "a deleted watch",
                     "value": {
                       "deleted": true,
-                      "id": "8XCkTdJYLJeJtZGQws1lRg"
+                      "id": "R7Oj5C6wm-MrDW38aTrRew"
                     }
                   }
                 }
@@ -6297,13 +6297,13 @@
                 "a new webhook channel": {
                   "summary": "a new webhook channel",
                   "value": {
-                    "url": "https://192.0.2.10/smoke/b7oe63pa"
+                    "url": "https://192.0.2.10/smoke/wxr28ezf"
                   }
                 },
                 "a webhook channel for screen hits only": {
                   "summary": "a webhook channel for screen hits only",
                   "value": {
-                    "url": "https://192.0.2.10/smoke/b7oe63pa/screens",
+                    "url": "https://192.0.2.10/smoke/wxr28ezf/screens",
                     "filter": [
                       "watch.screen"
                     ]
@@ -6325,23 +6325,23 @@
                   "a new webhook channel": {
                     "summary": "a new webhook channel",
                     "value": {
-                      "id": "12WSq03_s3uZeca321ojUw",
-                      "url": "https://192.0.2.10/smoke/b7oe63pa",
-                      "secret": "f9aycHLYscT8HL90x8h0MIxkjHY8_wKOB_IpZq6_fqQ",
+                      "id": "mPLBzaQiKwO2WVQyh8PHQg",
+                      "url": "https://192.0.2.10/smoke/wxr28ezf",
+                      "secret": "Y1JWzUs1o1ZnxrVMkP_mYxJ4lkOtTwOR35vSiwv9lWY",
                       "filter": null,
-                      "createdAt": 1791404028
+                      "createdAt": 1791406947
                     }
                   },
                   "a webhook channel for screen hits only": {
                     "summary": "a webhook channel for screen hits only",
                     "value": {
-                      "id": "FpD3yMoRHa82s5JqgPM8Ug",
-                      "url": "https://192.0.2.10/smoke/b7oe63pa/screens",
-                      "secret": "8MEQnD0lEcwu8ioJPJergJCWW18mROsTGlPmTrzJBnI",
+                      "id": "-FKA0WToL4nsE_UGDAFa6w",
+                      "url": "https://192.0.2.10/smoke/wxr28ezf/screens",
+                      "secret": "WvdteKWd690Ea05HRZeyyJamHCGSbc7hePJV7F0FO-4",
                       "filter": [
                         "watch.screen"
                       ],
-                      "createdAt": 1791404028
+                      "createdAt": 1791406947
                     }
                   }
                 }
@@ -6361,7 +6361,7 @@
                     "$ref": "#/components/schemas/SettleResponse"
                   }
                 },
-                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4Yjk2OUUxODgxNWRhZkREMkY4YjdFODNmMjEzM0NhQTRDY0RDMTc0MSIsInRyYW5zYWN0aW9uIjoiMHg4YTZjMjZjNWUyZTBlNDdiNjcxZTkyNDFkMDk4ZTU1NTMxZTM4NzI3YzdiNTExZWQ5Y2IxNWJjMjQ2MmFjYmE2IiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
+                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4OTY3NzNkOTZEZmJiMjE5Nzg1MzhFZmY0RjBBRWJGMjMyYzE3NTg1QiIsInRyYW5zYWN0aW9uIjoiMHgyNjE4NzUyZjYwZTI3OGYwN2U1ODJhYzIxYTUxNjVjMDE3MmQwMjRmMDk2MTFkNzcxZDhkNWIwMGUxY2JiYmVhIiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
               }
             }
           },
@@ -6552,26 +6552,26 @@
                     "value": {
                       "webhooks": [
                         {
-                          "id": "12WSq03_s3uZeca321ojUw",
-                          "url": "https://192.0.2.10/smoke/b7oe63pa",
+                          "id": "mPLBzaQiKwO2WVQyh8PHQg",
+                          "url": "https://192.0.2.10/smoke/wxr28ezf",
                           "filter": null,
                           "enabled": true,
-                          "verifiedAt": 1791404028,
+                          "verifiedAt": 1791406947,
                           "failures": 0,
                           "lastError": null,
-                          "createdAt": 1791404028
+                          "createdAt": 1791406947
                         },
                         {
-                          "id": "FpD3yMoRHa82s5JqgPM8Ug",
-                          "url": "https://192.0.2.10/smoke/b7oe63pa/screens",
+                          "id": "-FKA0WToL4nsE_UGDAFa6w",
+                          "url": "https://192.0.2.10/smoke/wxr28ezf/screens",
                           "filter": [
                             "watch.screen"
                           ],
                           "enabled": true,
-                          "verifiedAt": 1791404028,
+                          "verifiedAt": 1791406947,
                           "failures": 0,
                           "lastError": null,
-                          "createdAt": 1791404028
+                          "createdAt": 1791406947
                         }
                       ]
                     }
@@ -6760,7 +6760,7 @@
                     "summary": "a deleted webhook channel",
                     "value": {
                       "deleted": true,
-                      "id": "12WSq03_s3uZeca321ojUw"
+                      "id": "mPLBzaQiKwO2WVQyh8PHQg"
                     }
                   }
                 }
@@ -6946,8 +6946,8 @@
                   "a rotated secret": {
                     "summary": "a rotated secret",
                     "value": {
-                      "id": "12WSq03_s3uZeca321ojUw",
-                      "secret": "m4bh8FFVotMUQDu_bZNvfCT2N72RyP_P9aHF3YENQ7A"
+                      "id": "mPLBzaQiKwO2WVQyh8PHQg",
+                      "secret": "rcNDwyDzDR16ODPGmeQyJ4NeBeIJ4bUf6htNXFLLBjU"
                     }
                   }
                 }
@@ -7133,7 +7133,7 @@
                   "an enabled webhook channel": {
                     "summary": "an enabled webhook channel",
                     "value": {
-                      "id": "12WSq03_s3uZeca321ojUw",
+                      "id": "mPLBzaQiKwO2WVQyh8PHQg",
                       "enabled": true
                     }
                   }
@@ -7335,15 +7335,15 @@
                   "a new Telegram channel": {
                     "summary": "a new Telegram channel",
                     "value": {
-                      "id": "gSs7MLu-0hLQSwFvsBzVDA",
-                      "code": "OgW9J-BbUyxsK8dsWXG06w",
-                      "link": "https://t.me/arcgate_localnet_bot?start=OgW9J-BbUyxsK8dsWXG06w",
-                      "expiresAt": 1791404928,
+                      "id": "8Y2xYkEjv70IFNUl32CMfw",
+                      "code": "wYG3eTNGEdKFTAiETiGtXQ",
+                      "link": "https://t.me/arcgate_localnet_bot?start=wYG3eTNGEdKFTAiETiGtXQ",
+                      "expiresAt": 1791407847,
                       "filter": [
                         "watch",
                         "inbound"
                       ],
-                      "createdAt": 1791404028
+                      "createdAt": 1791406947
                     }
                   }
                 }
@@ -7363,7 +7363,7 @@
                     "$ref": "#/components/schemas/SettleResponse"
                   }
                 },
-                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4Yjk2OUUxODgxNWRhZkREMkY4YjdFODNmMjEzM0NhQTRDY0RDMTc0MSIsInRyYW5zYWN0aW9uIjoiMHgyM2NjOGU2Y2FmMzgzMDA5ZTE5YzU0ZjM1ODNiYWEzYWE1NzQ5YmRlZmNjODNlMzQ2YWVkOWQ0YjY5ODFmM2RjIiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
+                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4OTY3NzNkOTZEZmJiMjE5Nzg1MzhFZmY0RjBBRWJGMjMyYzE3NTg1QiIsInRyYW5zYWN0aW9uIjoiMHhiNzNhNDI2ZjhhOWVjMjhlMTBhOWY4NTRmZDA0Y2JlZTQ2YjQzMmMxMDc0ZGVkZmM2OWJlNDY0MTk0MzkxNzIwIiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
               }
             }
           },
@@ -7554,7 +7554,7 @@
                     "value": {
                       "telegrams": [
                         {
-                          "id": "gSs7MLu-0hLQSwFvsBzVDA",
+                          "id": "8Y2xYkEjv70IFNUl32CMfw",
                           "filter": [
                             "watch",
                             "inbound"
@@ -7564,7 +7564,7 @@
                           "failures": 0,
                           "lastError": null,
                           "linkCodeExpiresAt": null,
-                          "createdAt": 1791404028
+                          "createdAt": 1791406947
                         }
                       ]
                     }
@@ -7753,7 +7753,7 @@
                     "summary": "a deleted Telegram channel",
                     "value": {
                       "deleted": true,
-                      "id": "gSs7MLu-0hLQSwFvsBzVDA"
+                      "id": "8Y2xYkEjv70IFNUl32CMfw"
                     }
                   }
                 }
@@ -7939,10 +7939,10 @@
                   "a new link code": {
                     "summary": "a new link code",
                     "value": {
-                      "id": "gSs7MLu-0hLQSwFvsBzVDA",
-                      "code": "AmH9niS4FlZ7w2tbgiTwdA",
-                      "link": "https://t.me/arcgate_localnet_bot?start=AmH9niS4FlZ7w2tbgiTwdA",
-                      "expiresAt": 1791404940
+                      "id": "8Y2xYkEjv70IFNUl32CMfw",
+                      "code": "SoHF9TAfCyrkyPfuKZqESw",
+                      "link": "https://t.me/arcgate_localnet_bot?start=SoHF9TAfCyrkyPfuKZqESw",
+                      "expiresAt": 1791407862
                     }
                   }
                 }
@@ -8173,7 +8173,7 @@
                             ],
                             "calls": 2,
                             "budget": {
-                              "used": 3040,
+                              "used": 3073,
                               "limit": null,
                               "pct": 0,
                               "state": "ok"
@@ -8186,13 +8186,13 @@
                                 "spillover": false
                               },
                               "call": {
-                                "used": 1845,
+                                "used": 1873,
                                 "limit": null,
                                 "reserveMonthly": null,
                                 "spillover": false
                               },
                               "simulate": {
-                                "used": 1195,
+                                "used": 1200,
                                 "limit": null,
                                 "reserveMonthly": null,
                                 "spillover": false
@@ -8305,25 +8305,25 @@
                             "provider": "arc_anvil_local",
                             "method": "eth_getCode",
                             "month": "2026-10",
-                            "calls": 668
+                            "calls": 680
                           },
                           {
                             "provider": "arc_anvil_local",
                             "method": "eth_call",
                             "month": "2026-10",
-                            "calls": 749
+                            "calls": 762
                           },
                           {
                             "provider": "arc_anvil_local",
                             "method": "eth_getBlockByNumber",
                             "month": "2026-10",
-                            "calls": 390
+                            "calls": 394
                           },
                           {
                             "provider": "arc_anvil_local",
                             "method": "eth_simulateV1",
                             "month": "2026-10",
-                            "calls": 951
+                            "calls": 955
                           },
                           {
                             "provider": "arc_anvil_local",
@@ -8346,7 +8346,7 @@
                         ],
                         "budgets": {
                           "arc_anvil_local": {
-                            "used": 3040,
+                            "used": 3073,
                             "limit": null,
                             "pct": 0,
                             "state": "ok"
@@ -8554,6 +8554,107 @@
                         "docs": "https://docs.arcgate.dev",
                         "skill": "https://docs.arcgate.dev/plugin/skills/arcgate-trade/SKILL.md"
                       }
+                    }
+                  }
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          },
+          "500": {
+            "description": "internal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorBody"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "$ref": "#/components/headers/RequestId"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/.well-known/agentkarma.json": {
+      "get": {
+        "operationId": "agentKarmaManifest",
+        "tags": [
+          "service"
+        ],
+        "summary": "arcgate's AgentKarma manifest",
+        "description": "Returns the manifest AgentKarma (https://agentkarma.io) reads to attach arcgate's declared identity to its payment wallet.\n\n- **Cost:** Free.\n- **Inputs:** none.\n- **Returns:** `schema`, `name`, `wallet` (the address that receives every payment), `description`, `website`, `capabilities` (the MCP tool names) and `endpoints` (the MCP endpoint and this document). Prices are in `agentRegistration` and in this document.\n- **Next:**\n  - `agentRegistration`: the ERC-8004 registration file, with each route's price.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "AgentKarma manifest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentKarmaManifest"
+                },
+                "examples": {
+                  "arcgate's AgentKarma manifest": {
+                    "summary": "arcgate's AgentKarma manifest",
+                    "value": {
+                      "schema": "agentkarma.v1",
+                      "name": "arcgate",
+                      "wallet": "0x68151F5863B3bF97B35982dA445D04161776D2E7",
+                      "description": "The gateway to Arc for agents. Trade: token search, checked best-price swap quotes and ready-to-sign swap transactions across Arc's DEX venues. Agents: Arc's ERC-8004 agent directory, searched by what registration files declare. Agent services: a private box with inbound addresses, token and agent watches, and webhook and Telegram channels. Paid per call over x402 in USDC; arcgate never holds funds or signs.",
+                      "website": "https://arcgate.dev",
+                      "capabilities": [
+                        "tradeSearch",
+                        "tradeQuote",
+                        "tradeSwap",
+                        "tradeSwapTx",
+                        "tradeReceipt",
+                        "tradeVenues",
+                        "agentSearch",
+                        "agentProfile",
+                        "agentWallet",
+                        "boxCreate",
+                        "boxTopUp",
+                        "boxStatus",
+                        "boxMessageList",
+                        "boxMessageFetch",
+                        "boxMessageDelete",
+                        "inboundCreate",
+                        "inboundList",
+                        "inboundDelete",
+                        "inboundRotate",
+                        "watchCreate",
+                        "watchList",
+                        "watchDelete",
+                        "webhookCreate",
+                        "webhookList",
+                        "webhookDelete",
+                        "webhookRotate",
+                        "webhookEnable",
+                        "telegramCreate",
+                        "telegramList",
+                        "telegramDelete",
+                        "telegramLink",
+                        "health"
+                      ],
+                      "endpoints": [
+                        {
+                          "kind": "http",
+                          "url": "https://api.arcgate.dev/mcp",
+                          "description": "Every arcgate route as an MCP tool: token search, swap quotes, ready-to-sign swap transactions, swap receipts, the venue list, the ERC-8004 agent directory (search, profile, wallet lookup), and an agent's own services: its box (create, top up, signed status, messages), inbound addresses, token watches, and webhook and Telegram channels."
+                        },
+                        {
+                          "kind": "http",
+                          "url": "https://api.arcgate.dev/openapi.json",
+                          "description": "OpenAPI 3.1 document for every HTTP route, with request and response schemas and each paid route's x402 price."
+                        }
+                      ]
                     }
                   }
                 }
@@ -13592,6 +13693,67 @@
         ],
         "additionalProperties": false
       },
+      "AgentKarmaManifest": {
+        "type": "object",
+        "properties": {
+          "schema": {
+            "type": "string",
+            "const": "agentkarma.v1"
+          },
+          "name": {
+            "type": "string"
+          },
+          "wallet": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "website": {
+            "type": "string"
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "endpoints": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "http"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "kind",
+                "url",
+                "description"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "schema",
+          "name",
+          "wallet",
+          "description",
+          "website",
+          "capabilities",
+          "endpoints"
+        ],
+        "additionalProperties": false
+      },
       "AgentsErrorResponse": {
         "type": "object",
         "properties": {
@@ -16091,7 +16253,7 @@
             "$ref": "#/components/schemas/PaymentPayload"
           }
         },
-        "example": "eyJ4NDAyVmVyc2lvbiI6MiwicGF5bG9hZCI6eyJhdXRob3JpemF0aW9uIjp7ImZyb20iOiIweDVFZGZmODJGMEU3REMyNTk2OGNiYThCNjE0YmVERDc4MmFjMmNFREQiLCJ0byI6IjB4OTg3RjcxOWI1MTZmNTI4ZjQwODBFRjA4NTNFMzdhRDVkN0U3NzNBMCIsInZhbHVlIjoiNTAwMCIsInZhbGlkQWZ0ZXIiOiIwIiwidmFsaWRCZWZvcmUiOiIxNzkxNDA0Mjk3Iiwibm9uY2UiOiIweDY5NjA5ZGUzNDRmNGM1OTcxM2EzZDA1NmU1OTk4OGQ3NWNmNmZlYjIyODllOGI0MTJjYmM5MzZkMzRlNGE3YWIifSwic2lnbmF0dXJlIjoiMHhjZDdiMzI4ZTk0YjBkMzllNTE0M2JhYTE3MTZlNTA1ZGM2MjgxMWU0YWQ1Yjk4MTczODAzNTUyYTYyYmMzM2FmMDg0YjZlN2FiNzhkMjRhMzAwZWMxNjI3ZDg2NTliMjFlZmY1ZTEyNzhhNTkwOTIwMzYwNWIxMzBiOWY1OTU4OTFiIn0sInJlc291cmNlIjp7InVybCI6Imh0dHBzOi8vYXBpLmFyY2dhdGUuZGV2L3RyYWRlL3YxL3NlYXJjaCIsImRlc2NyaXB0aW9uIjoiVG9rZW4gc2VhcmNoIiwibWltZVR5cGUiOiIifSwiYWNjZXB0ZWQiOnsic2NoZW1lIjoiZXhhY3QiLCJuZXR3b3JrIjoiZWlwMTU1OjUwNDIwMDIiLCJhbW91bnQiOiI1MDAwIiwiYXNzZXQiOiIweDM2MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLCJwYXlUbyI6IjB4OTg3RjcxOWI1MTZmNTI4ZjQwODBFRjA4NTNFMzdhRDVkN0U3NzNBMCIsIm1heFRpbWVvdXRTZWNvbmRzIjozMDAsImV4dHJhIjp7Im5hbWUiOiJVU0RDIiwidmVyc2lvbiI6IjIifX19"
+        "example": "eyJ4NDAyVmVyc2lvbiI6MiwicGF5bG9hZCI6eyJhdXRob3JpemF0aW9uIjp7ImZyb20iOiIweDVFZGZmODJGMEU3REMyNTk2OGNiYThCNjE0YmVERDc4MmFjMmNFREQiLCJ0byI6IjB4OTg3RjcxOWI1MTZmNTI4ZjQwODBFRjA4NTNFMzdhRDVkN0U3NzNBMCIsInZhbHVlIjoiNTAwMCIsInZhbGlkQWZ0ZXIiOiIwIiwidmFsaWRCZWZvcmUiOiIxNzkxNDA3MjIwIiwibm9uY2UiOiIweDNjNGUwMTM1MmU5Nzk4MDhjY2VhYWZiYTg1MTUwODkxOGQ2OWQ2NDYwNWY0NjBjOTcxODlkZWE2MGQ4MGJmNGEifSwic2lnbmF0dXJlIjoiMHgyNmRkYjk2ZWNkZDdlMDVlMTU1ODNhYWJlZWFkOTYzM2RkYzE2ZjRkMDc4MDcyZDNhY2NiMzhlOTM3MDc2YmE5MjM4ZmE1ODYyYjgyMGU1NzhjODk0ODFmZmQwYjA1OGMyM2U4NTZlZjZiMTUyODc5NTIxYTEyMTJhYjIxMWMwOTFjIn0sInJlc291cmNlIjp7InVybCI6Imh0dHBzOi8vYXBpLmFyY2dhdGUuZGV2L3RyYWRlL3YxL3NlYXJjaCIsImRlc2NyaXB0aW9uIjoiVG9rZW4gc2VhcmNoIiwibWltZVR5cGUiOiIifSwiYWNjZXB0ZWQiOnsic2NoZW1lIjoiZXhhY3QiLCJuZXR3b3JrIjoiZWlwMTU1OjUwNDIwMDIiLCJhbW91bnQiOiI1MDAwIiwiYXNzZXQiOiIweDM2MDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAiLCJwYXlUbyI6IjB4OTg3RjcxOWI1MTZmNTI4ZjQwODBFRjA4NTNFMzdhRDVkN0U3NzNBMCIsIm1heFRpbWVvdXRTZWNvbmRzIjozMDAsImV4dHJhIjp7Im5hbWUiOiJVU0RDIiwidmVyc2lvbiI6IjIifX19"
       },
       "AgentSignature": {
         "name": "AGENT-SIGNATURE",

@@ -8,7 +8,7 @@
   // Operations are listed in the order a caller uses them, not alphabetically.
   // Tag and group order are not set here: the document's `tags` and `x-tagGroups`
   // (TAG_GROUPS in packages/core/src/openapi/document.ts) carry them, and Scalar follows the document.
-  var OPERATION_ORDER = ["tradeSearch", "tradeQuote", "tradeSwap", "tradeSwapTx", "tradeReceipt", "tradeVenues", "agentSearch", "agentProfile", "agentWallet", "boxCreate", "boxTopUp", "boxStatus", "boxMessageList", "boxMessageFetch", "boxMessageDelete", "inboundCreate", "inboundList", "inboundDelete", "inboundRotate", "watchCreate", "watchList", "watchDelete", "webhookCreate", "webhookList", "webhookDelete", "webhookRotate", "webhookEnable", "telegramCreate", "telegramList", "telegramDelete", "telegramLink", "mcp", "mcpInfo", "health", "openapi", "agentRegistration"];
+  var OPERATION_ORDER = ["tradeSearch", "tradeQuote", "tradeSwap", "tradeSwapTx", "tradeReceipt", "tradeVenues", "agentSearch", "agentProfile", "agentWallet", "boxCreate", "boxTopUp", "boxStatus", "boxMessageList", "boxMessageFetch", "boxMessageDelete", "inboundCreate", "inboundList", "inboundDelete", "inboundRotate", "watchCreate", "watchList", "watchDelete", "webhookCreate", "webhookList", "webhookDelete", "webhookRotate", "webhookEnable", "telegramCreate", "telegramList", "telegramDelete", "telegramLink", "mcp", "mcpInfo", "health", "openapi", "agentRegistration", "agentKarmaManifest"];
 
   function rank(list, key) {
     var i = list.indexOf(key);
