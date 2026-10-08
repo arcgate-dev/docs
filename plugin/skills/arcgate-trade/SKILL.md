@@ -210,7 +210,7 @@ The answer has a `quoteId`, the best route under `best` (expected output, `minAm
 | Verdict | Meaning | What to do |
 | --- | --- | --- |
 | `ok`, `pinned` | Sells back normally; `pinned` is a fixed trusted asset (USDC, EURC, cirBTC) | Proceed |
-| `taxed` | Buy/sell taxes (`buyTaxBps`, `sellTaxBps`, `roundTripLossBps`) | Tell the user the taxes and round-trip loss; proceed only if they accept |
+| `taxed` | Buy/sell taxes (`buyTaxBps`, `sellTaxBps`, `roundTripLossBps`), with no known sell tax above the API's maximum (`trade.quote.max_sell_tax_bps`), though `sellTaxBps` can be null (unmeasured); buy tax and round-trip loss have no cap. Normal for launchpad meme coins: Argus and most other launchpads set a fixed tax at launch | Tell the user the taxes and round-trip loss; proceed only if they accept |
 | `size_limited` | A per-transaction cap (`maxBuyUsdc`) | Tell the user; trade at or below the cap |
 | `illiquid` | Not enough liquidity to exit | Stop and tell the user |
 | `cannot_sell` | Buying works, selling back doesn't (a honeypot), or its sell tax is above the API's maximum (`trade.quote.max_sell_tax_bps`) | Stop. Don't swap |
@@ -325,7 +325,9 @@ message's payload is marked untrusted.
     `{"field":…,"op":…,"value":…}`. The figures `volume_24h` (USD), `traders_24h`, `trades_24h`,
     `sells_24h`, `sellers_24h`, `top_trader_share_24h` (0 to 1), `depth_2pct_usd` and `age_hours` take
     `gt`, `gte`, `lt` or `lte` and a number. `safety_verdict`, `launch_state` and `launchpad` take `eq`
-    and one value, or `in` and a list. "Tell me when MOLLY's 24h volume passes 50k" is
+    and one value, or `in` and a list. On meme coins, a sellable token is usually `taxed`, not `ok`:
+    a discovery screen that should keep them uses `{"field":"safety_verdict","op":"in","value":["ok","taxed"]}`,
+    and `eq` `ok` only when the user wants no taxed tokens. "Tell me when MOLLY's 24h volume passes 50k" is
     `{"kind":"token","token":"<MOLLY's address>","where":[{"field":"volume_24h","op":"gt","value":50000}]}`.
   - `pools`, `lookalikes` and `safety_verdict` also take `changes`, with no `value`:
     `{"field":"pools","op":"changes"}` holds when the field moved from the baseline the watch keeps
