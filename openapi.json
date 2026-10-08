@@ -16259,7 +16259,7 @@
         "name": "AGENT-SIGNATURE",
         "in": "header",
         "required": true,
-        "description": "The EIP-712 signature (0x hex) over the AgentRequest typed data: the box's address, this request's method and path with every parameter filled in (the address lowercased), the keccak256 of its canonical-JSON body (of no bytes when there is none), the nonce and the expiry. Domain {name: \"arcgate\", version: \"1\"}, no chainId. A missing header is a 401 signature_required.",
+        "description": "The EIP-712 signature (0x hex) over the AgentRequest typed data: the box's address, this request's method and path with every parameter filled in (the address lowercased), the keccak256 of its canonical-JSON body (of no bytes when there is none), the nonce and the expiry. Domain {name: \"arcgate\", version: \"1\"}, no chainId; a wallet that can only sign with one (such as Circle's) may add the chainId of the chain this deployment serves (5042 on Arc mainnet), and no other. A missing header is a 401 signature_required.",
         "schema": {
           "type": "string",
           "pattern": "^0x[0-9a-fA-F]+$"
