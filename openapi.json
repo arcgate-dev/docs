@@ -9479,7 +9479,7 @@
             "type": "object",
             "properties": {
               "field": {
-                "description": "The token's age of the token in hours. Read only when a change names the token: passing time alone never re-evaluates a screen, so a token that crosses an age line while quiet is seen at its next change.",
+                "description": "The token's age of the token in hours. Read only when a change names the token: passing time alone never re-evaluates a screen, so a token that crosses an age line while quiet is seen at its next change. For a token no indexed launchpad created, age counts from the earlier of its earliest pool creation, counted only once every pool it has has a creation time, and the first trade the index saw when that trade first brought the token into the index; a token with neither known has no age, which never matches.",
                 "type": "string",
                 "const": "age_hours"
               },
@@ -10223,6 +10223,7 @@
             ]
           },
           "ageHours": {
+            "description": "Hours since the token's creation. For a token no indexed launchpad created, since the earlier of its earliest pool creation, counted only once every pool it has has a creation time, and the first trade the index saw when that trade first brought the token into the index; null when neither is known.",
             "anyOf": [
               {
                 "type": "number"
@@ -10643,6 +10644,7 @@
                 ]
               },
               "createdAt": {
+                "description": "When the token was created. For a token no indexed launchpad created, the earlier of its earliest pool creation, counted only once every pool it has has a creation time, and the first trade the index saw when that trade first brought the token into the index; null when neither is known. createdBlock stays null for such a token.",
                 "anyOf": [
                   {
                     "type": "string"

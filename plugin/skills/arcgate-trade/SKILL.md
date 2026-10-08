@@ -324,7 +324,10 @@ message's payload is marked untrusted.
   - Both take the same `where`: one to eight clauses, all of which must hold. A clause is
     `{"field":…,"op":…,"value":…}`. The figures `volume_24h` (USD), `traders_24h`, `trades_24h`,
     `sells_24h`, `sellers_24h`, `top_trader_share_24h` (0 to 1), `depth_2pct_usd` and `age_hours` take
-    `gt`, `gte`, `lt` or `lte` and a number. `safety_verdict`, `launch_state` and `launchpad` take `eq`
+    `gt`, `gte`, `lt` or `lte` and a number. `age_hours` counts from the launchpad's creation, or, for
+    a token no indexed launchpad created, from its first pool's creation (once every pool it has has a
+    creation time) or the first trade the index saw, so new tokens from other launchers match age
+    screens too. A token whose age is unknown never matches an `age_hours` clause. `safety_verdict`, `launch_state` and `launchpad` take `eq`
     and one value, or `in` and a list. On meme coins, a sellable token is usually `taxed`, not `ok`:
     a discovery screen that should keep them uses `{"field":"safety_verdict","op":"in","value":["ok","taxed"]}`,
     and `eq` `ok` only when the user wants no taxed tokens. "Tell me when MOLLY's 24h volume passes 50k" is
