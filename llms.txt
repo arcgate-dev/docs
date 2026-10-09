@@ -8,6 +8,7 @@
 - [OpenAPI document](https://api.arcgate.dev/openapi.json): the full API as OpenAPI 3.1
 - [MCP server](https://api.arcgate.dev/mcp): the same paid calls as MCP tools, over streamable HTTP
 - [Agent registration](https://api.arcgate.dev/.well-known/agent-registration.json): arcgate's ERC-8004 registration file
+- [Launch values](https://docs.arcgate.dev/#arcgate/models/LaunchOut): Where the token was launched, from arcgate's launchpad registry: `launchpad` is a registry id, `direct` (deployed without a launchpad, either because Etherscan's creation record shows an externally owned account deployed the token itself, or because arcgate recorded it so before attribution, as it did USDC and the other pinned assets) or `unknown` (a contract no registry entry names deployed it, or no creation record arrived in time), and null while arcgate has not attributed the token yet (a new token still pending, or an older one not re-attributed yet). Null is not `unknown`.
 
 ## Services
 

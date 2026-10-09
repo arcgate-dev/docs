@@ -1,6 +1,6 @@
 {
   "name": "arcgate-trade",
-  "version": "1.8.2",
+  "version": "1.10.0",
   "description": "Use when an agent needs to turn a plain-English crypto order on Arc (\"buy 100 USDC of X\", \"sell my MOLLY for USDC\") into a checked trade through the arcgate API - resolve the token, quote it, read the safety verdict, and get unsigned transactions for the user's wallet - or to set up its own box with inbound addresses others can post to, watches (\"tell me when MOLLY gets a new pool\") and channels (a webhook or Telegram) that deliver what it hears. Every search, quote, swap and create is paid per call in real USDC over x402; includes a script that makes those paid calls with a wallet key. Your first message after loading this skill, before any command, is a `Spend:` line listing each paid call you may make, with its price in USDC.",
   "homepage": "https://docs.arcgate.dev/",
   "author": {

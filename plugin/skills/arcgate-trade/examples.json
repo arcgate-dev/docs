@@ -80,17 +80,58 @@
   },
   {
     "id": "screen-watch",
-    "order": "tell me about any token whose 24h volume passes $1",
-    "reading": "Watch every token the index reports, not one named token: a screen that fires for each token whose 24 hour volume comes to be greater than 1 USD. Each hit is a `watch.screen` message.",
+    "order": "tell me about new launches that are traded by several accounts and can be sold",
+    "reading": "Watch every token the index reports, not one named token: a screen that fires for each token that is 15 minutes to 24 hours old, has at least 100 USD of 24 hour volume, was launched from a launchpad or by a contract the registry does not name (`launchpad_kind` is `launchpad` or `unknown`), has at least 3 sells and 3 traders with no one over half the volume, and whose safety verdict is `ok` or `taxed` (a sellable launchpad coin is usually `taxed`). Each hit is a `watch.screen` message.",
     "operation": "watchCreate",
     "request": {
       "condition": {
         "kind": "screen",
         "where": [
           {
+            "field": "age_hours",
+            "op": "gte",
+            "value": 0.25
+          },
+          {
+            "field": "age_hours",
+            "op": "lte",
+            "value": 24
+          },
+          {
             "field": "volume_24h",
-            "op": "gt",
-            "value": 1
+            "op": "gte",
+            "value": 100
+          },
+          {
+            "field": "launchpad_kind",
+            "op": "in",
+            "value": [
+              "launchpad",
+              "unknown"
+            ]
+          },
+          {
+            "field": "sells_24h",
+            "op": "gte",
+            "value": 3
+          },
+          {
+            "field": "traders_24h",
+            "op": "gte",
+            "value": 3
+          },
+          {
+            "field": "top_trader_share_24h",
+            "op": "lte",
+            "value": 0.5
+          },
+          {
+            "field": "safety_verdict",
+            "op": "in",
+            "value": [
+              "ok",
+              "taxed"
+            ]
           }
         ]
       }

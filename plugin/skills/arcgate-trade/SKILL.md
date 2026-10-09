@@ -152,7 +152,7 @@ node scripts/arcgate.mjs boxCreate
 node scripts/arcgate.mjs inboundCreate
 node scripts/arcgate.mjs inboundPost '{"url":"<url from inboundCreate>","secret":"<secret>","body":{"hello":"box"}}'
 node scripts/arcgate.mjs watchCreate '{"condition":{"kind":"token","token":"0x171a4217b86a807a64eb94757db6849fb4bdbaa0","where":[{"field":"volume_24h","op":"gt","value":1}]}}'
-node scripts/arcgate.mjs watchCreate '{"condition":{"kind":"screen","where":[{"field":"volume_24h","op":"gt","value":1}]}}'
+node scripts/arcgate.mjs watchCreate '{"condition":{"kind":"screen","where":[{"field":"age_hours","op":"gte","value":0.25},{"field":"age_hours","op":"lte","value":24},{"field":"volume_24h","op":"gte","value":100},{"field":"launchpad_kind","op":"in","value":["launchpad","unknown"]},{"field":"sells_24h","op":"gte","value":3},{"field":"traders_24h","op":"gte","value":3},{"field":"top_trader_share_24h","op":"lte","value":0.5},{"field":"safety_verdict","op":"in","value":["ok","taxed"]}]}}'
 node scripts/arcgate.mjs watchCreate '{"condition":{"kind":"agents","chainId":5042,"on":["registered"]}}'
 node scripts/arcgate.mjs watchCreate '{"condition":{"kind":"agent","chainId":5042,"agentId":1365,"on":["wallet_changed","feedback"]}}'
 node scripts/arcgate.mjs webhookCreate '{"url":"https://192.0.2.10/hook"}'
@@ -188,6 +188,17 @@ first, then use an address:
 
 1. `search` with `{ "query": "MOLLY" }`.
 2. Read `results[]`: each has `address`, `verification` (`status`, `source`, `trust`) and `safety`.
+   Each also has `launch` (`launchpad`, `kind`, `name`, `url`): where the token was launched.
+   `launchpad` is a registry id (such as `argus`), or `direct` (deployed without a launchpad,
+   including tokens recorded direct before attribution, such as USDC and the other pinned assets),
+   or `unknown` (no registry entry names the deployer, or no creation record arrived in time), or
+   null, which means arcgate has not attributed the token yet. Null is not `unknown`. When
+   `launch.url` is present, send the person to it to see the token where it launched. Never build
+   or guess a launchpad URL, and when `launchpad` is null there is none.
+   The search also takes optional `launchpad` and `launchpadKind` arrays, with the values a watch
+   clause takes (see the watch clauses under Agent services). They narrow `results` only: `resolution`, ranks and flags still
+   describe every token the query matched, and an address query the filter drops answers
+   `results: []`.
    If `resolution` is `"ambiguous"`, or several results share the symbol, don't pick on your own
    unless one is the verified canonical token. Ask the user, or say which one you picked and why.
    When nobody can answer (a headless or scheduled run) and the call moves no funds (`search`, `quote`,
@@ -202,7 +213,8 @@ USDC is `0x3600000000000000000000000000000000000000` (native and ERC-20 USDC are
 
 `quote` takes `sell`, `buy`, `amount`, and optionally `side` (default `exactIn`) and
 `slippageBps` (default 100). Pass `taker` too: the wallet that will swap. Leave `venues` out: it
-searches every venue.
+searches every venue. The token side carries `launch`, in the same shape as a search result; the
+USDC side has none.
 
 The answer has a `quoteId`, the best route under `best` (expected output, `minAmountOut`, fees,
 `executable`) and `safety.verdict`:
@@ -324,13 +336,20 @@ message's payload is marked untrusted.
   - Both take the same `where`: one to eight clauses, all of which must hold. A clause is
     `{"field":…,"op":…,"value":…}`. The figures `volume_24h` (USD), `traders_24h`, `trades_24h`,
     `sells_24h`, `sellers_24h`, `top_trader_share_24h` (0 to 1), `depth_2pct_usd` and `age_hours` take
-    `gt`, `gte`, `lt` or `lte` and a number. `age_hours` counts from the launchpad's creation, or, for
-    a token no indexed launchpad created, from its first pool's creation (once every pool it has has a
-    creation time) or the first trade the index saw, so new tokens from other launchers match age
-    screens too. A token whose age is unknown never matches an `age_hours` clause. `safety_verdict`, `launch_state` and `launchpad` take `eq`
-    and one value, or `in` and a list. On meme coins, a sellable token is usually `taxed`, not `ok`:
+    `gt`, `gte`, `lt` or `lte` and a number. `age_hours` counts from the token's creation time: the
+    launchpad's, or Etherscan's for a token no indexed launchpad created, so new tokens from other
+    launchers match age screens too. Only when no creation record arrived does it count from the
+    earlier of its earliest pool creation (once every pool it has has a creation time) and the first
+    trade the index saw. A token whose age is unknown never matches an `age_hours` clause. `safety_verdict`, `launch_state`, `launchpad` and `launchpad_kind` take `eq`
+    and one value, or `in` and a list. `launchpad` takes every registry id (the OpenAPI enum lists
+    them), plus `direct` and `unknown`; `none` is gone. `launchpad_kind` takes `launchpad`, `bot`,
+    `protocol`, `direct` or `unknown`, so a screen can leave out bot-made copies (the `launchpad_kind`
+    clause in the example commands above is the captured form). A token not attributed yet has a
+    null launchpad, which never matches. On meme coins, a sellable token is usually `taxed`, not `ok`:
     a discovery screen that should keep them uses `{"field":"safety_verdict","op":"in","value":["ok","taxed"]}`,
-    and `eq` `ok` only when the user wants no taxed tokens. "Tell me when MOLLY's 24h volume passes 50k" is
+    and `eq` `ok` only when the user wants no taxed tokens. A new token with a USDC pool reaches screens
+    with its safety verdict and depth already measured; a token without one reads `safety_verdict` and
+    `depth_2pct_usd` null, which no clause matches. "Tell me when MOLLY's 24h volume passes 50k" is
     `{"kind":"token","token":"<MOLLY's address>","where":[{"field":"volume_24h","op":"gt","value":50000}]}`.
   - `pools`, `lookalikes` and `safety_verdict` also take `changes`, with no `value`:
     `{"field":"pools","op":"changes"}` holds when the field moved from the baseline the watch keeps
@@ -352,6 +371,10 @@ message's payload is marked untrusted.
     refused with `agent_not_found`.
   - A token watch's hit is a `watch.token` message, a screen's a `watch.screen` message, and an
     agent screen's or an agent watch's a `watch.agent` message.
+  - A `watch.token` or `watch.screen` hit carries the token exactly as `search` returns it for its
+    address (symbol, name, evidence, venues, `launch`), plus `watchId`, `condition`, `changeId`, `token`
+    and `observed` (each clause field's value). A `changes` clause adds `previous`, and a `lookalikes` watch
+    adds `newest`. You can act on a hit without searching again. When `launch.url` is set, send people there.
 
 - **Channel:** a route pushing copies of messages out. The box stays the record. A **webhook channel**
   pushes to an HTTPS URL the agent owns, signed; the URL must answer an ownership challenge. A
