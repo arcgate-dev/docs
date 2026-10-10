@@ -87,8 +87,8 @@ Every call has a matching MCP tool on `POST /mcp`, with the same inputs and pric
 | `GET /trade/v1/venues` | `tradeVenues` | List the venues | free |
 | `GET /health` | `health` | Service status | free |
 | `POST /agents/v1/{chainId}/search` | `agentSearch` | Search the ERC-8004 agent directory | 0.005 USDC |
-| `GET /agents/v1/{chainId}/agent/{agentId}` | `agentProfile` | Profile one ERC-8004 agent | 0.0001 USDC |
-| `GET /agents/v1/{chainId}/wallet/{address}` | `agentWallet` | Find the agents an address owns or pays through | 0.0001 USDC |
+| `GET /agents/v1/{chainId}/agent/{agentId}` | `agentProfile` | Profile one ERC-8004 agent | 0.005 USDC |
+| `GET /agents/v1/{chainId}/wallet/{address}` | `agentWallet` | Find the agents an address owns or pays through | 0.005 USDC |
 | `POST /agent/v1/{address}/box` | `boxCreate` | Create your box | 0.05 USDC |
 | `POST /agent/v1/{address}/box/topup` | `boxTopUp` | Top up your box | 0.05 USDC |
 | `GET /agent/v1/{address}/box/status` | `boxStatus` | Read your box's status | free |
