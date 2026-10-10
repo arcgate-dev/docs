@@ -69,7 +69,7 @@ codex exec --skip-git-repo-check --sandbox workspace-write -c sandbox_workspace_
 **Either way,** the plugin or a copied folder needs its dependencies once (`npm install --prefix <skill dir>/scripts`,
 the `<skill dir>` being where the skill now is) and these in the environment of the agent, never in the conversation:
 
-- `PRIVATE_KEY`: the agent's own wallet key, holding USDC on the network the API charges on.
+- `PRIVATE_KEY`: the agent's own wallet key, holding USDC on Arc, the option the script pays.
 - `API_URL`: `https://api.arcgate.dev` by default; a local stack's URL (for example `http://127.0.0.1:19800`) to try the skill without real money.
 - `ARCGATE_MAX_PAYMENT`: the most one payment may be, in USDC (default `0.05`).
 
@@ -117,13 +117,14 @@ These are the seed prices (ADR 0004). The live ones are in `GET /openapi.json` a
 ## 1. Paying: read this before the first paid call
 
 Search, quote, swap, and the agent services' creates (box, inbound addresses, watches, channels) and box
-top-ups cost **real USDC on Arc mainnet**, paid per call with [x402](https://x402.org). An agent can only
+top-ups cost **real USDC on Arc or Base**, paid per call with [x402](https://x402.org). An agent can only
 make those calls if it can run code and has a wallet key to pay with.
 
-- **Can run code (Claude Code and similar):** use `scripts/arcgate.mjs` from this skill. Once:
-  `npm install --prefix <this skill's directory>/scripts`. It needs `PRIVATE_KEY` (the agent's own
-  signing key, a wallet holding USDC on Arc) in the environment, the same key for every call to that
-  agent's box. It refuses any single payment above `ARCGATE_MAX_PAYMENT` (USDC, default `0.05`, enough
+- **Can run code (Claude Code and similar):** use this skill's script.
+  `scripts/arcgate.mjs` pays the Arc option, so `PRIVATE_KEY` holds USDC on Arc. Once:
+  `npm install --prefix <this skill's directory>/scripts`.
+  It needs `PRIVATE_KEY` (the agent's own signing key) in the environment, the same key for every call
+  to that agent's box. It refuses any single payment above `ARCGATE_MAX_PAYMENT` (USDC, default `0.05`, enough
   for search, quote, a swap under $10,000, a box create or a box top-up at 0.05 each at the seed
   price, with the cap inclusive). The swap fee grows with trade size, so raise it for a large swap. Never
   ask the user to paste a private key into the conversation; they set it in the environment. Use one key
