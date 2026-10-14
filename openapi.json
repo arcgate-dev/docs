@@ -3110,20 +3110,20 @@
                         "fetchStatus": "fetched",
                         "lastAttempt": {
                           "uri": "https://api.arcgate.dev/.well-known/agent-registration.json",
-                          "at": 1790912412,
+                          "at": 1791912786,
                           "error": null
                         },
                         "lastGood": {
                           "uri": "https://api.arcgate.dev/.well-known/agent-registration.json",
-                          "fetchedAt": 1790912412,
+                          "fetchedAt": 1791912786,
                           "name": "arcgate",
-                          "description": "Token search, best-price swap quotes and ready-to-sign swap transactions for agents trading on Arc. Resolves a ticker to the right token, checks it can be sold, routes across Arc's DEX venues, and is paid per call over x402 in USDC.",
+                          "description": "The gateway to Arc for agents. Trade: token search, checked best-price swap quotes and ready-to-sign swap transactions across Arc's DEX venues. Agents: Arc's ERC-8004 agent directory, searched by what registration files declare. Agent services: a private box with inbound addresses, token and agent watches, and webhook and Telegram channels. Paid per call over x402 in USDC; arcgate never holds funds or signs.",
                           "x402Support": true,
                           "active": true,
                           "services": [
                             {
                               "name": "MCP",
-                              "endpoint": "https://api.arcgate.dev/trade/v1/mcp",
+                              "endpoint": "https://api.arcgate.dev/mcp",
                               "version": "2025-11-25",
                               "domainVerified": true
                             },
@@ -3132,24 +3132,80 @@
                               "endpoint": "https://api.arcgate.dev/openapi.json",
                               "version": "3.1.0",
                               "domainVerified": true
-                            },
-                            {
-                              "name": "docs",
-                              "endpoint": "https://docs.arcgate.dev",
-                              "version": null,
-                              "domainVerified": false
-                            },
-                            {
-                              "name": "web",
-                              "endpoint": "https://arcgate.dev",
-                              "version": null,
-                              "domainVerified": false
                             }
                           ],
                           "capabilities": [
                             {
                               "kind": "mcp_tool",
+                              "value": "agentProfile"
+                            },
+                            {
+                              "kind": "mcp_tool",
+                              "value": "agentSearch"
+                            },
+                            {
+                              "kind": "mcp_tool",
+                              "value": "agentWallet"
+                            },
+                            {
+                              "kind": "mcp_tool",
+                              "value": "boxCreate"
+                            },
+                            {
+                              "kind": "mcp_tool",
+                              "value": "boxMessageDelete"
+                            },
+                            {
+                              "kind": "mcp_tool",
+                              "value": "boxMessageFetch"
+                            },
+                            {
+                              "kind": "mcp_tool",
+                              "value": "boxMessageList"
+                            },
+                            {
+                              "kind": "mcp_tool",
+                              "value": "boxStatus"
+                            },
+                            {
+                              "kind": "mcp_tool",
+                              "value": "boxTopUp"
+                            },
+                            {
+                              "kind": "mcp_tool",
                               "value": "health"
+                            },
+                            {
+                              "kind": "mcp_tool",
+                              "value": "inboundCreate"
+                            },
+                            {
+                              "kind": "mcp_tool",
+                              "value": "inboundDelete"
+                            },
+                            {
+                              "kind": "mcp_tool",
+                              "value": "inboundList"
+                            },
+                            {
+                              "kind": "mcp_tool",
+                              "value": "inboundRotate"
+                            },
+                            {
+                              "kind": "mcp_tool",
+                              "value": "telegramCreate"
+                            },
+                            {
+                              "kind": "mcp_tool",
+                              "value": "telegramDelete"
+                            },
+                            {
+                              "kind": "mcp_tool",
+                              "value": "telegramLink"
+                            },
+                            {
+                              "kind": "mcp_tool",
+                              "value": "telegramList"
                             },
                             {
                               "kind": "mcp_tool",
@@ -3174,6 +3230,38 @@
                             {
                               "kind": "mcp_tool",
                               "value": "tradeVenues"
+                            },
+                            {
+                              "kind": "mcp_tool",
+                              "value": "watchCreate"
+                            },
+                            {
+                              "kind": "mcp_tool",
+                              "value": "watchDelete"
+                            },
+                            {
+                              "kind": "mcp_tool",
+                              "value": "watchList"
+                            },
+                            {
+                              "kind": "mcp_tool",
+                              "value": "webhookCreate"
+                            },
+                            {
+                              "kind": "mcp_tool",
+                              "value": "webhookDelete"
+                            },
+                            {
+                              "kind": "mcp_tool",
+                              "value": "webhookEnable"
+                            },
+                            {
+                              "kind": "mcp_tool",
+                              "value": "webhookList"
+                            },
+                            {
+                              "kind": "mcp_tool",
+                              "value": "webhookRotate"
                             }
                           ]
                         },
@@ -3210,7 +3298,7 @@
                     "$ref": "#/components/schemas/SettleResponse"
                   }
                 },
-                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4NUVhZjlGQzUxNjUxRThBZTAwNWZmNjA3N2UwMEE2ZTY3MDRlNDMyMiIsInRyYW5zYWN0aW9uIjoiMHhiNjdiZGY1YmI1MzRkYTE2NDc3NjMwOTZhMzNlODk1NjhmMGNjZjhkZjQ2NjkwYTE4MmRiMzgwMTQxMTYxMjYwIiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
+                "example": "eyJzdWNjZXNzIjp0cnVlLCJwYXllciI6IjB4NGJkZTY3MTE2OTcyNmE4NkQ5OTA0ZDdCMThGMzFhOUE0MDEwY2U4NyIsInRyYW5zYWN0aW9uIjoiMHg5NDBiNmJmZjNmNDk1NDM5ZDk5NWE4N2FjOTZhNTVmN2U3YzkyZDI5MmMxM2FhYmE4NDNlOWMxYmRmMjljOWY3IiwibmV0d29yayI6ImVpcDE1NTo1MDQyMDAyIn0="
               }
             }
           },
