@@ -213,7 +213,7 @@ USDC is `0x3600000000000000000000000000000000000000` (native and ERC-20 USDC are
 ## 4. Quote, and read the safety verdict
 
 `quote` takes `sell`, `buy`, `amount`, and optionally `side` (default `exactIn`) and
-`slippageBps` (default 100). Pass `taker` too: the wallet that will swap. Leave `venues` out: it
+`slippageBps` (default 100) and `exitRisk` (`warn`, the default, or `stop`, below). Pass `taker` too: the wallet that will swap. Leave `venues` out: it
 searches every venue. The token side carries `launch`, in the same shape as a search result; the
 USDC side has none.
 
@@ -226,10 +226,36 @@ The answer has a `quoteId`, the best route under `best` (expected output, `minAm
 | `taxed` | Buy/sell taxes (`buyTaxBps`, `sellTaxBps`, `roundTripLossBps`), with no known sell tax above the API's maximum (`trade.quote.max_sell_tax_bps`), though `sellTaxBps` can be null (unmeasured); buy tax and round-trip loss have no cap. Normal for launchpad meme coins: Argus and most other launchpads set a fixed tax at launch | Tell the user the taxes and round-trip loss; proceed only if they accept |
 | `size_limited` | A per-transaction cap (`maxBuyUsdc`) | Tell the user; trade at or below the cap |
 | `illiquid` | Not enough liquidity to exit | Stop and tell the user |
-| `cannot_sell` | Buying works, selling back doesn't (a honeypot), or its sell tax is above the API's maximum (`trade.quote.max_sell_tax_bps`) | Stop. Don't swap |
-| `inconclusive` | Couldn't be measured | Tell the user it's unverified; don't proceed on your own |
+| `high_tax` | The token sells, but its sell tax is above the API's maximum (`trade.quote.max_sell_tax_bps`) and below the honeypot ceiling (`trade.quote.honeypot_sell_tax_bps`). A token whose tax at the ceiling or above was measured inside its launchpad's launch window reads `high_tax` too, with a `launch_window` warning, until the check after the window | Stop. Don't swap: `swap` refuses it with 422 `high_tax`. Tell the user the tax |
+| `cannot_sell` | Buying works, selling back doesn't (a honeypot), or its sell tax is at or above the honeypot ceiling (`trade.quote.honeypot_sell_tax_bps`) | Stop. Don't swap |
+| `inconclusive` | The sell check couldn't confirm the token can be sold. Its cause decides `next`: `stop` (`sell_unverified`) or `requote` (`sell_check_incomplete`), below | Follow `next`. Never swap an inconclusive quote |
 
 If `best.executable` is `false`, the route can't be swapped: say so and stop (`next: "stop"`).
+
+`exitRisk` on a quote (and on every search result) is the token's exit risk, a rating separate
+from `safety.verdict`: did outside buyers get out, from the trading history (`low`, `elevated`,
+`high` or `unknown`; null when the token has no rating yet, and on a quote when you buy USDC). It
+describes the token you buy. A `high` level adds an `exit_risk_high` warning: tell the user. With
+`exitRisk: "stop"` on the request a `high` level is `next: stop`, `nextReason.code`
+`exit_risk_high`, and `swap` refuses that quote with `422 exit_risk_high`. Its `limitations` say what
+it can't see: `no_deployer_history`, `hook_supplied_liquidity` (liquidity a hook supplies),
+`curve_trades_not_indexed` (a launchpad curve token reads `unknown`). Shares in its `facts` are in
+basis points, null below their sample.
+
+A quote whose `next` is not `swap` also has `nextReason`: `{ code, hint }`. An `inconclusive` quote is
+still charged, and `next` tells you what to do:
+
+- **`stop`, `nextReason.code` `sell_unverified`:** the sell check could not confirm the token can be
+  sold, and quoting again will not change that. Stop and tell the user the token is unverified. Do
+  not swap: `swap` refuses it with `422 sell_unverified`, whatever the output token (USDC included).
+- **`requote`, `nextReason.code` `sell_check_incomplete`:** the sell check did not finish (a provider
+  error or a call limit). Quote again shortly. If the second quote also says `requote`, stop and tell
+  the user the token could not be verified. `swap` still accepts a `requote` quote: a token output is
+  re-checked from the recipient wallet, and a re-check that doesn't finish is `503 rpc_unavailable`;
+  a USDC or pinned output is served. Don't lean on that: quote again first.
+
+A `requote` never overrides a stop: a sell check that didn't finish, on a quote that also can't be
+executed or whose taker isn't ready, says `stop`, with `nextReason.code` `not_executable` or `not_ready`.
 
 With `taker`, the answer also has `readiness`, checked at the quote's block. Read it before paying
 for a swap:
@@ -271,10 +297,12 @@ On `409 quote_stale` or `410 quote_expired`:
   `safety.verdict` and `readiness` as in section 4, tell the user the new price, and swap its
   `quoteId` if they still want it. There is one per paid quote.
 - **`next` is `stop`:** the new quote came back untradeable: no route or not enough liquidity, a
-  `cannot_sell` or `illiquid` verdict, a route that can't be executed, or a taker that can't finish
-  it. `error.hint` says which. Tell the user the trade can't be done now, and why.
+  `cannot_sell`, `high_tax` or `illiquid` verdict, a sell that couldn't be verified (`sell_unverified`), a route
+  that can't be executed, or a taker that can't finish it. `error.hint` names the code. Tell the user
+  the trade can't be done now, and why.
 - **No `quote`, `next` is `requote`:** quote again yourself. This includes a server error while
-  arcgate re-quoted: it doesn't mean the trade is impossible.
+  arcgate re-quoted, and a fresh quote whose sell check did not finish (`requote`): neither means the
+  trade is impossible. If that quote also says `requote`, stop and tell the user.
 
 ## 6. Confirm the fill
 
@@ -341,20 +369,21 @@ message's payload is marked untrusted.
     launchpad's, or Etherscan's for a token no indexed launchpad created, so new tokens from other
     launchers match age screens too. Only when no creation record arrived does it count from the
     earlier of its earliest pool creation (once every pool it has has a creation time) and the first
-    trade the index saw. A token whose age is unknown never matches an `age_hours` clause. `safety_verdict`, `launch_state`, `launchpad` and `launchpad_kind` take `eq`
-    and one value, or `in` and a list. `launchpad` takes every registry id (the OpenAPI enum lists
+    trade the index saw. A token whose age is unknown never matches an `age_hours` clause. `safety_verdict`, `exit_risk`, `launch_state`, `launchpad` and `launchpad_kind` take `eq`
+    and one value, or `in` and a list. `exit_risk` is the stored exit-risk level (`low`, `elevated`,
+    `high`, `unknown`; a token with no rating reads null, which never matches), and a worse level or a liquidity pull fires at once, inside the cooldown. `launchpad` takes every registry id (the OpenAPI enum lists
     them), plus `direct` and `unknown`; `none` is gone. `launchpad_kind` takes `launchpad`, `bot`,
     `protocol`, `direct` or `unknown`, so a screen can leave out bot-made copies (the `launchpad_kind`
     clause in the example commands above is the captured form). A token not attributed yet has a
     null launchpad, which never matches. On meme coins, a sellable token is usually `taxed`, not `ok`:
     a discovery screen that should keep them uses `{"field":"safety_verdict","op":"in","value":["ok","taxed"]}`,
-    and `eq` `ok` only when the user wants no taxed tokens. A new token with a USDC pool reaches screens
+    and `eq` `ok` only when the user wants no taxed tokens. A token whose sell tax is above the API's maximum reads `high_tax` in a screen as in a quote, so that `in` list leaves it out; a watch can name `high_tax` too. A new token with a USDC pool reaches screens
     with its safety verdict and depth already measured; a token without one reads `safety_verdict` and
     `depth_2pct_usd` null, which no clause matches. "Tell me when MOLLY's 24h volume passes 50k" is
     `{"kind":"token","token":"<MOLLY's address>","where":[{"field":"volume_24h","op":"gt","value":50000}]}`.
-  - `pools`, `lookalikes` and `safety_verdict` also take `changes`, with no `value`:
+  - `pools`, `lookalikes`, `safety_verdict` and `exit_risk` also take `changes`, with no `value`:
     `{"field":"pools","op":"changes"}` holds when the field moved from the baseline the watch keeps
-    (the pool count or the lookalike count went up, the verdict differs). The first reading only
+    (the pool count or the lookalike count went up, the verdict differs, `exit_risk` holds when the level differs or a new liquidity pull appears). The first reading only
     records the baseline and never fires. A watch takes at most one `changes` clause. `lookalikes`
     is for a token watch only, as its only clause, on a token whose ticker group is verified (any
     other token is refused). On a screen a `changes` clause needs a state clause beside it.
@@ -428,7 +457,7 @@ inbound-create, token-watch, screen-watch, agents-watch, agent-watch and webhook
 Every error body has `next` beside `error`: do what `next` says, and read `error.code` for why.
 Every trade 200 carries `next` too.
 
-- **quote:** `swap` (tradable) or `stop` (`cannot_sell`, `illiquid`, not executable, or the taker can't finish).
+- **quote:** `swap` (tradable), `stop` (`cannot_sell`, `high_tax`, `illiquid`, `sell_unverified`, `exit_risk_high`, not executable, or the taker can't finish) or `requote` (the sell check didn't finish: quote again shortly, stop if the second also says `requote`). A `stop` or `requote` quote names its reason in `nextReason`.
 - **swap:** `sign_permit` (`signatures` non-empty) or `send`.
 - **swap-tx:** `send`.
 - **receipt:** `done` (pass), `requote` or `stop` (fail), `retry` (pending).
@@ -442,10 +471,10 @@ the payment facilitator fails mid-call.
 
 | `next` | Codes | What you do |
 | --- | --- | --- |
-| `requote` | `quote_not_found`, `quote_stale`, `quote_expired`, `swap_attempts_exhausted` | Swap the free new quote in `quote` if the body has one and the user accepts its price (section 5). Otherwise quote again, then swap the new `quoteId`. `swap_attempts_exhausted` means the failed attempts for that quote are used up: that call won't run again |
+| `requote` | `quote_not_found`, `quote_stale`, `quote_expired`, `swap_attempts_exhausted` | Swap the free new quote in `quote` if the body has one and the user accepts its price (section 5). Otherwise quote again, then swap the new `quoteId`. `swap_attempts_exhausted` means the failed attempts for that quote are used up: that call won't run again. On a quote 200, `requote` (`nextReason.code` `sell_check_incomplete`) means the sell check did not finish: quote again shortly, and stop if the second quote also says `requote` |
 | `retry` | `rpc_unavailable`, `lookup_rate_limited`, `receipt_rate_limited`, `payment_unavailable`, `rate_limited`, `ip_blocked`, `notifier_unavailable`, `telegram_unavailable`, `box_full` | Send the same request again, after `retryAfterSec` seconds when the body has it |
 | `fix_request` | `invalid_request`, `ticker_not_allowed`, `invalid_amount`, `unsupported_pair`, `unknown_venue`, `unknown_source`, `taker_required`, `token_not_found`, `payload_too_large`, `no_pending_swap`, `unknown_chain`, `agent_not_found`, `signature_required`, `invalid_signature`, `signature_expired`, `nonce_reused`, `box_required`, `box_not_found`, `message_not_found`, `inbound_unauthorized`, `inbound_address_not_found`, `inbound_address_limit`, `watch_not_found`, `watch_limit`, `webhook_not_found`, `webhook_limit`, `telegram_not_found`, `telegram_limit`, `unsupported_encoding` | The request is wrong: fix it, then send it. For `no_pending_swap`, no permit round is open for that quote, taker and recipient: call paid `swap` first, with the same taker and recipient. A round is used once |
-| `stop` | `no_route`, `insufficient_liquidity`, `unsupported_venue`, `buy_reverts`, `insufficient_balance`, `swap_reverts`, `cannot_sell`, `not_executable`, `swap_not_found`, `receipt_reads_exhausted`, `internal`, `client_closed`, `payer_not_box`, `box_exists`, `allowance_full`, `allowance_exhausted`, `allowance_expired` | Don't retry. Tell the user why (`error.message`) |
+| `stop` | `no_route`, `insufficient_liquidity`, `unsupported_venue`, `buy_reverts`, `insufficient_balance`, `swap_reverts`, `cannot_sell`, `high_tax`, `exit_risk_high`, `sell_unverified`, `not_executable`, `swap_not_found`, `receipt_reads_exhausted`, `internal`, `client_closed`, `payer_not_box`, `box_exists`, `allowance_full`, `allowance_exhausted`, `allowance_expired` | Don't retry. Tell the user why (`error.message`). `sell_unverified` is a quote or `swap` whose sell check could not confirm the token can be sold: the token is unverified, so don't swap it. `exit_risk_high` is a quote asked with `exitRisk: "stop"` (or the `swap` of one) whose token rated high: tell the user |
 | `pay` | `payment_required` | Pay the 402. The script does it |
 | `sign_permit` | - | Have the taker sign `signatures[0].typedData`, then call `swap-tx` with `permit` (section 5) |
 | `swap` | - | On a quote: it is tradable. Call `swap` with its `quoteId` |
@@ -470,7 +499,7 @@ Trade example: "spend 100 USDC on MOLLY", after search resolves MOLLY:
 1. Write the `Spend:` line first, before any command, with each paid call's price. Can you pay? If not, say so before starting.
 2. Settle `exactIn` vs `exactOut`. Ask if the amount's currency is ambiguous.
 3. Resolve every ticker with `search`. Use addresses.
-4. Quote. Read `safety.verdict` and `best.executable`. Stop on `cannot_sell` or `illiquid`.
+4. Quote. Read `safety.verdict` and `best.executable`. Stop on `cannot_sell`, `high_tax` or `illiquid`, and on `next: stop` (`sell_unverified`). On `next: requote`, quote again; a second `requote` is a stop.
 5. Swap within 120 seconds with a `taker` that holds the funds. With Permit2, send the signed permit
    to the free `swap-tx`. On a `409` or `410`, offer the free new `quote` at its price. On
    `next: stop`, stop.
