@@ -1,6 +1,6 @@
 ---
 name: arcgate-trade
-description: Use when an agent needs to turn a plain-English crypto order on Arc ("buy 100 USDC of X", "sell my MOLLY for USDC") into a checked trade through the arcgate API - resolve the token, quote it, read the safety verdict, and get unsigned transactions for the user's wallet - or to set up its own box with inbound addresses others can post to, watches ("tell me when MOLLY gets a new pool") and channels (a webhook or Telegram) that deliver what it hears. Every search, quote, swap and create is paid per call in real USDC over x402; includes a script that makes those paid calls with a wallet key. Your first message after loading this skill, before any command, is a `Spend:` line listing each paid call you may make, with its price in USDC.
+description: Use when an agent needs to turn a plain-English crypto order on Arc ("buy 100 USDC of X", "sell my MOLLY for USDC") into a checked trade through the arcgate API - resolve the token, quote it, read the safety verdict, and get unsigned transactions for the user's wallet - or to set up its own box with inbound addresses others can post to, watches ("tell me when MOLLY gets a new pool") and channels (a webhook or Telegram) that deliver what it hears. Search, quote, swap, the agent directory lookups and account and box purchases (creates, top-ups, units, credit, renewal, inbound address, watch and channel creates) cost real USDC, over x402 or, for search, quote and the lookups, from an account's units with its ARCGATE-KEY; a linked box's setup creates are free with its account's key. Every other call is free. Its script makes the trade and box calls with a wallet key. Your first message after loading this skill, before any command, is a `Spend:` line listing each paid call you may make, with its price in USDC.
 ---
 
 # arcgate: trades and the agent's box
@@ -56,14 +56,14 @@ cp -R <skill folder> .agents/skills/arcgate-trade
 npm install --prefix .agents/skills/arcgate-trade/scripts
 ```
 
-Codex drops environment variables named like `*KEY*` from the commands it runs, so `PRIVATE_KEY` would
-never reach the script, and its `workspace-write` sandbox blocks the network. Start it with both
+Codex drops environment variables named like `*KEY*` from the commands it runs, so `PRIVATE_KEY` and
+`ARCGATE_KEY` would never reach the script, and its `workspace-write` sandbox blocks the network. Start it with both
 lifted, and with only the variables the script needs let through, so none of your other keys or tokens
 (`OPENAI_API_KEY`, `GH_TOKEN`) reaches a command the agent runs. `include_only` filters last, after the
 default drop, so `ignore_default_excludes` must stay. `--skip-git-repo-check` lets it start outside a git repo:
 
 ```
-codex exec --skip-git-repo-check --sandbox workspace-write -c sandbox_workspace_write.network_access=true -c shell_environment_policy.inherit=all -c shell_environment_policy.ignore_default_excludes=true -c 'shell_environment_policy.include_only=["PATH","HOME","PRIVATE_KEY","API_URL","ARCGATE_MAX_PAYMENT"]' "<what you want done>"
+codex exec --skip-git-repo-check --sandbox workspace-write -c sandbox_workspace_write.network_access=true -c shell_environment_policy.inherit=all -c shell_environment_policy.ignore_default_excludes=true -c 'shell_environment_policy.include_only=["PATH","HOME","PRIVATE_KEY","ARCGATE_KEY","API_URL","ARCGATE_MAX_PAYMENT"]' "<what you want done>"
 ```
 
 **Either way,** the plugin or a copied folder needs its dependencies once (`npm install --prefix <skill dir>/scripts`,
@@ -72,10 +72,11 @@ the `<skill dir>` being where the skill now is) and these in the environment of 
 - `PRIVATE_KEY`: the agent's own wallet key, holding USDC on Arc, the option the script pays.
 - `API_URL`: `https://api.arcgate.dev` by default; a local stack's URL (for example `http://127.0.0.1:19800`) to try the skill without real money.
 - `ARCGATE_MAX_PAYMENT`: the most one payment may be, in USDC (default `0.05`).
+- `ARCGATE_KEY` (only with an account): a key of the account, sent in `ARCGATE-KEY`. See "Paying with an account key" below.
 
 ## Calls and prices
 
-Every call has a matching MCP tool on `POST /mcp`, with the same inputs and prices. `scripts/arcgate.mjs` makes the trade calls under short names (`search`, `quote`, `swap`, `swap-tx`, `receipt`, `venues`, `health`) and every `/agent/v1` call, plus `inboundPost`, under their MCP tool names. The ERC-8004 directory calls (`agentSearch`, `agentProfile`, `agentWallet`) are made over HTTP or MCP, not by the script.
+Every call has a matching MCP tool on `POST /mcp`, with the same inputs and prices. `scripts/arcgate.mjs` makes the trade calls under short names (`search`, `quote`, `swap`, `swap-tx`, `receipt`, `venues`, `health`) and every `/agent/v1` call, plus `inboundPost`, under their MCP tool names. The ERC-8004 directory calls (`agentSearch`, `agentProfile`, `agentWallet`) are made over HTTP or MCP, not by the script. The account calls (`/account/v1`: opening, renewing and managing an [account](https://docs.arcgate.dev/#arcgate/tag/account)) are signed by the account's owner, which the script does not do, so they are not listed here: the script only uses an account's key (`ARCGATE_KEY`).
 
 | Call | MCP tool | What it does | Price |
 | --- | --- | --- | --- |
@@ -91,7 +92,9 @@ Every call has a matching MCP tool on `POST /mcp`, with the same inputs and pric
 | `GET /agents/v1/{chainId}/wallet/{address}` | `agentWallet` | Find the agents an address owns or pays through | 0.005 USDC |
 | `POST /agent/v1/{address}/box` | `boxCreate` | Create your box | 0.05 USDC |
 | `POST /agent/v1/{address}/box/topup` | `boxTopUp` | Top up your box | 0.05 USDC |
+| `POST /agent/v1/{address}/box/units` | `boxUnitsBuy` | Buy units for your box's watch hits, `{units}` | 0.005 USDC a unit, at least 20 units (0.10 USDC) |
 | `GET /agent/v1/{address}/box/status` | `boxStatus` | Read your box's status | free |
+| `POST /agent/v1/{address}/box/spend-cap` | `boxSpendCap` | Cap or uncap the units your box's watch hits draw in a UTC day | free |
 | `GET /agent/v1/{address}/box/messages` | `boxMessageList` | List your messages, from a `cursor` | free |
 | `GET /agent/v1/{address}/box/messages/{seq}` | `boxMessageFetch` | Fetch one message | free |
 | `DELETE /agent/v1/{address}/box/messages/{seq}` | `boxMessageDelete` | Delete one message | free |
@@ -111,6 +114,16 @@ Every call has a matching MCP tool on `POST /mcp`, with the same inputs and pric
 | `GET /agent/v1/{address}/telegram/list` | `telegramList` | List your Telegram channels | free |
 | `DELETE /agent/v1/{address}/telegram/{id}` | `telegramDelete` | Delete a Telegram channel | free |
 | `POST /agent/v1/{address}/telegram/{id}/link` | `telegramLink` | Get a new link code for a Telegram channel | free |
+| `POST /agent/v1/{address}/box/link` | `boxLink` | Link your box to an account, so its watch hits draw the account's units; signed by the box, authorized by the account's key or its owner | free |
+| `DELETE /agent/v1/{address}/box/link` | `boxUnlink` | Unlink your box from its account and get a fresh allowance | free |
+
+An account past its period's units keeps working on overage credit, bought with `accountCredit` (at least 1 USDC,
+anyone may pay): a keyed call or a linked box's hit then draws credit at 1.25 times the tier's unit rate. During the 3-day grace
+after a period ends, units, credit and linked boxes keep working. After it the account is lapsed: its keys stay valid, but a key's
+calls take the normal 402, credit is frozen until `accountRenew`, and each linked box runs on its own allowance.
+`accountRenew` starts the next period, at the tier scheduled with `accountTier`, else the account's own, and restores a lapsed account; while the period still runs it is a 409
+`period_running`, before any payment. A renewal whose tier changed after it was priced (a tier scheduled while the payment was verified)
+is a 409 `renewal_repriced`: ask again and pay the new price, nothing settled.
 
 These are the seed prices (ADR 0004). The live ones are in `GET /openapi.json` and in every 402.
 
@@ -126,7 +139,9 @@ make those calls if it can run code and has a wallet key to pay with.
   It needs `PRIVATE_KEY` (the agent's own signing key) in the environment, the same key for every call
   to that agent's box. It refuses any single payment above `ARCGATE_MAX_PAYMENT` (USDC, default `0.05`, enough
   for search, quote, a swap under $10,000, a box create or a box top-up at 0.05 each at the seed
-  price, with the cap inclusive). The swap fee grows with trade size, so raise it for a large swap. Never
+  price, with the cap inclusive). The swap fee grows with trade size, so raise it for a large swap. The
+  cheapest `boxUnitsBuy` is the minimum units times the unit price (0.10 USDC at the seed price), above the
+  default, so set `ARCGATE_MAX_PAYMENT` to at least that before buying units, or the script refuses the buy. Never
   ask the user to paste a private key into the conversation; they set it in the environment. Use one key
   per agent and never share it. Don't check the key or the modules by hand before the first call: the
   script says when `PRIVATE_KEY` or its modules are missing.
@@ -134,6 +149,15 @@ make those calls if it can run code and has a wallet key to pay with.
   health) work. The free agent calls need a signature from the box's key, and the paid ones need
   payment. The rest of this skill still helps plan the trade. Tell the user the paid calls need an
   x402-capable client, and point them at the docs.
+
+**Paying with an account key.** An [account](https://docs.arcgate.dev/#arcgate/tag/account) is another way to pay. An `ARCGATE-KEY: <key>` header on `tradeSearch`, `tradeQuote`, `agentSearch`, `agentProfile` or `agentWallet` draws the account's units
+instead of paying over x402; with `ARCGATE_KEY` set, the script sends it on `search` and `quote`. An account that cannot pay gets the normal 402; the script then pays it over x402 with `PRIVATE_KEY`, capped as before by
+`ARCGATE_MAX_PAYMENT`. `swap` is x402 only: the script never sends the key on it. A key of the account a box is linked to (`boxLink`) makes the
+box's setup creates (`inboundCreate`, `watchCreate`, `webhookCreate`, `telegramCreate`) free while the account's period or its grace runs, within the tier's limits;
+once the account has lapsed the key gets the normal price like any caller. A key does not apply to a box linked to another account or to none: the API takes the
+create as if no key were sent, so the script sends the key on every setup create and pays a 402 over x402 with `PRIVATE_KEY`. A key no account holds is 401
+`key_invalid`: fix `ARCGATE_KEY` or unset it. Link the box first (`boxLink`) for its setup creates to be free. `boxLink` takes the key to authorize the
+link. `boxCreate`, `boxTopUp`, `boxUnitsBuy` and `boxUnlink` never take it: the box's own signature authorizes an unlink.
 
 Make one call per command, so each answer and its receipt stand alone. arcgate never charges an error
 answer. If a payment fails to settle, check the
@@ -424,14 +448,42 @@ message's payload is marked untrusted.
   left reach 0, new ones are refused (inbound posts get 402 `allowance_exhausted`; watch hits are not
   stored). When expiry passes, the box expires and all messages are deleted within the hour. Top up
   before either happens. The numbers (messages and days per payment, the maximum, per-box caps) are in
-  `GET /openapi.json`; the box's own figures are in `boxStatus`.
+  `GET /openapi.json`; the box's own figures are in `boxStatus`. From the cutover date an unlinked box may
+  hold 10 watches, 1 screen and 2 agent screens (the figures in force are in `GET /openapi.json`). A box
+  over them keeps every watch and message, but a new create is 409 `watch_limit` until it is under.
+- **Units:** a box also has a balance of units (`unitBalance` in `boxStatus`), bought with `boxUnitsBuy`
+  (paid, anyone may pay, at least the minimum in `GET /openapi.json`). From the cutover date a watch hit
+  draws units instead of an allowance message. A box with none has its watches paused (`state`
+  `paused_no_units` in `watchList`): hits are not stored and count in `unstoredWatchHits`, and the box gets
+  one `notice` with event `paused_no_units`. A `notice` with event `units_low` warns before that. A units
+  buy lifts that pause. A box at its held limit pauses its watches (`state` `paused_box_full`, one
+  `notice` with event `paused_box_full`) until it has room for the largest hit it refused, by a delete, an
+  expiry or a raised limit. While the box is `paused_box_full`, a hit it has room for is still stored and
+  charged, and only a hit that does not fit is refused and counted in `unstoredWatchHits`. A box paused
+  both ways resumes only when both pauses have cleared. Notices are free and are stored even in a full
+  box, and a stored notice is held like any message and counts toward the held limit, so the room has to
+  cover the `paused_box_full` notice too. A `notice` with event
+  `allowance_expiring_first` or `allowance_expiring_last` (with `expiresAt`) warns before the allowance
+  expires. The `paused_no_units`, `paused_box_full` and expiring notices reach every channel whatever its
+  filter.
+  `boxSpendCap` (free, signed by the box) sets a daily spend cap, `{maxUnitsPerDay}` (null clears it; there
+  is none by default), shown as `maxUnitsPerDay` in `boxStatus`. It counts the units the box's watch hits
+  draw in a UTC day, its own or its linked account's. A hit that would pass it is not stored and counts in
+  `unstoredWatchHits`, and the watches pause (`state` `paused_daily_cap`, one `notice` with event
+  `paused_daily_cap`, `maxUnitsPerDay` and `resumesAt`, which follows the channel's filter) until the next
+  UTC day, or until you clear the cap or raise it above both the cap in force and the units drawn today.
+  Keyed lookups are never limited by it. A `notice` with event
+  `units_cutover_announced` (when the cutover date is set) and one with `units_cutover_soon` (the number
+  of days before it given in `GET /openapi.json`) carry `cutoverAt` and the box's `limits` from then; they follow the channel's filter. A lapsed
+  box keeps its unit balance for the hold stated in `GET /openapi.json`, and a `boxTopUp` within that time
+  brings it back with that balance; after it the balance is 0.
 
 **Call order:**
 1. `boxCreate` (paid by the box's own address, from PRIVATE_KEY)
 2. `inboundCreate` / `watchCreate` / `webhookCreate` / `telegramCreate` (paid by the box's address)
 3. `boxMessageList`, `boxMessageFetch`, `boxMessageDelete` (reads never consume; advance the cursor
    after handling a page)
-4. `boxTopUp` when the allowance runs low (check `boxStatus`)
+4. `boxTopUp` when the allowance runs low, `boxUnitsBuy` when `unitBalance` runs low (check `boxStatus`)
 
 **Auth:** the paid creates must be paid by the box's own address, so PRIVATE_KEY's address IS the
 box. The free calls are signed with PRIVATE_KEY, the box's own key: `AGENT-SIGNATURE` / `AGENT-NONCE` /
@@ -472,9 +524,9 @@ the payment facilitator fails mid-call.
 | `next` | Codes | What you do |
 | --- | --- | --- |
 | `requote` | `quote_not_found`, `quote_stale`, `quote_expired`, `swap_attempts_exhausted` | Swap the free new quote in `quote` if the body has one and the user accepts its price (section 5). Otherwise quote again, then swap the new `quoteId`. `swap_attempts_exhausted` means the failed attempts for that quote are used up: that call won't run again. On a quote 200, `requote` (`nextReason.code` `sell_check_incomplete`) means the sell check did not finish: quote again shortly, and stop if the second quote also says `requote` |
-| `retry` | `rpc_unavailable`, `lookup_rate_limited`, `receipt_rate_limited`, `payment_unavailable`, `rate_limited`, `ip_blocked`, `notifier_unavailable`, `telegram_unavailable`, `box_full` | Send the same request again, after `retryAfterSec` seconds when the body has it |
-| `fix_request` | `invalid_request`, `ticker_not_allowed`, `invalid_amount`, `unsupported_pair`, `unknown_venue`, `unknown_source`, `taker_required`, `token_not_found`, `payload_too_large`, `no_pending_swap`, `unknown_chain`, `agent_not_found`, `signature_required`, `invalid_signature`, `signature_expired`, `nonce_reused`, `box_required`, `box_not_found`, `message_not_found`, `inbound_unauthorized`, `inbound_address_not_found`, `inbound_address_limit`, `watch_not_found`, `watch_limit`, `webhook_not_found`, `webhook_limit`, `telegram_not_found`, `telegram_limit`, `unsupported_encoding` | The request is wrong: fix it, then send it. For `no_pending_swap`, no permit round is open for that quote, taker and recipient: call paid `swap` first, with the same taker and recipient. A round is used once |
-| `stop` | `no_route`, `insufficient_liquidity`, `unsupported_venue`, `buy_reverts`, `insufficient_balance`, `swap_reverts`, `cannot_sell`, `high_tax`, `exit_risk_high`, `sell_unverified`, `not_executable`, `swap_not_found`, `receipt_reads_exhausted`, `internal`, `client_closed`, `payer_not_box`, `box_exists`, `allowance_full`, `allowance_exhausted`, `allowance_expired` | Don't retry. Tell the user why (`error.message`). `sell_unverified` is a quote or `swap` whose sell check could not confirm the token can be sold: the token is unverified, so don't swap it. `exit_risk_high` is a quote asked with `exitRisk: "stop"` (or the `swap` of one) whose token rated high: tell the user |
+| `retry` | `rpc_unavailable`, `lookup_rate_limited`, `receipt_rate_limited`, `payment_unavailable`, `rate_limited`, `ip_blocked`, `notifier_unavailable`, `telegram_unavailable`, `box_full`, `renewal_repriced` | Send the same request again, after `retryAfterSec` seconds when the body has it |
+| `fix_request` | `invalid_request`, `ticker_not_allowed`, `invalid_amount`, `unsupported_pair`, `unknown_venue`, `unknown_source`, `taker_required`, `token_not_found`, `payload_too_large`, `no_pending_swap`, `unknown_chain`, `agent_not_found`, `signature_required`, `invalid_signature`, `signature_expired`, `nonce_reused`, `box_required`, `box_not_found`, `message_not_found`, `inbound_unauthorized`, `inbound_address_not_found`, `inbound_address_limit`, `watch_not_found`, `watch_limit`, `tier_does_not_fit`, `webhook_not_found`, `webhook_limit`, `telegram_not_found`, `telegram_limit`, `unsupported_encoding`, `account_not_found`, `key_invalid`, `key_wrong_account`, `key_not_found`, `transfer_not_found`, `link_not_found`, `box_limit` | The request is wrong: fix it, then send it. For `no_pending_swap`, no permit round is open for that quote, taker and recipient: call paid `swap` first, with the same taker and recipient. A round is used once |
+| `stop` | `no_route`, `insufficient_liquidity`, `unsupported_venue`, `buy_reverts`, `insufficient_balance`, `swap_reverts`, `cannot_sell`, `high_tax`, `exit_risk_high`, `sell_unverified`, `not_executable`, `swap_not_found`, `receipt_reads_exhausted`, `internal`, `client_closed`, `payer_not_box`, `box_exists`, `account_exists`, `box_linked`, `account_lapsed`, `period_running`, `allowance_full`, `allowance_exhausted`, `allowance_expired` | Don't retry. Tell the user why (`error.message`). `sell_unverified` is a quote or `swap` whose sell check could not confirm the token can be sold: the token is unverified, so don't swap it. `exit_risk_high` is a quote asked with `exitRisk: "stop"` (or the `swap` of one) whose token rated high: tell the user |
 | `pay` | `payment_required` | Pay the 402. The script does it |
 | `sign_permit` | - | Have the taker sign `signatures[0].typedData`, then call `swap-tx` with `permit` (section 5) |
 | `swap` | - | On a quote: it is tradable. Call `swap` with its `quoteId` |

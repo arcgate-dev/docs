@@ -3,10 +3,10 @@
 // in PRIVATE_KEY.
 //
 //   node arcgate.mjs <search|quote|swap|swap-tx|receipt|venues|health> ['<json body>']
-//   node arcgate.mjs <boxCreate|boxTopUp|inboundCreate|watchCreate|webhookCreate|telegramCreate> ['<json body>']
+//   node arcgate.mjs <boxCreate|boxTopUp|boxUnitsBuy|inboundCreate|watchCreate|webhookCreate|telegramCreate> ['<json body>']
 //   node arcgate.mjs <boxStatus|boxMessageList|boxMessageFetch|boxMessageDelete|inboundList|inboundDelete|
 //     inboundRotate|watchList|watchDelete|webhookList|webhookDelete|webhookRotate|webhookEnable|
-//     telegramList|telegramDelete|telegramLink> ['<json arguments>']
+//     telegramList|telegramDelete|telegramLink|boxLink|boxUnlink|boxSpendCap> ['<json arguments>']
 //   node arcgate.mjs inboundPost '{"url":"…","secret":"…","body":{…}}'
 //
 // The agent calls are named by their MCP tool and made by the box PRIVATE_KEY's address: the creates are
@@ -17,6 +17,15 @@
 // Env:
 //   PRIVATE_KEY          the wallet that pays the fee, holding USDC on Arc, and is the box (every call but
 //                        health, venues, receipt, swap-tx and inboundPost)
+//   ARCGATE_KEY          a key of an account, sent in ARCGATE-KEY on search and quote (they draw the account's units;
+//                        an account that cannot pay gets the 402, which PRIVATE_KEY then pays), and on boxLink,
+//                        where it authorizes linking the box (boxUnlink never carries it). On the four setup creates it is
+//                        sent only when the box is linked to the key's account, which the script first asks with a
+//                        keyed boxStatus: a 200 sends it (the create is free while the account's period or grace
+//                        runs, else the 402, paid by PRIVATE_KEY); a 401 or 403 (no box, an unlinked box, another
+//                        account's key, a key no account holds) sends the create without it, paid over x402 by
+//                        PRIVATE_KEY; any other answer (a 429) is printed and no create is sent. Never on swap or
+//                        the other calls
 //   ARCGATE_MAX_PAYMENT  largest single payment allowed, in USDC (default 0.05)
 //   API_URL              default https://api.arcgate.dev
 //
@@ -42,7 +51,9 @@ export const OPERATIONS = {
   // The agent's box (/agent/v1): one entry per MCP tool, `{address}` being the key's address.
   boxCreate: { method: "POST", path: "/agent/v1/{address}/box", paid: true },
   boxTopUp: { method: "POST", path: "/agent/v1/{address}/box/topup", paid: true },
+  boxUnitsBuy: { method: "POST", path: "/agent/v1/{address}/box/units", paid: true },
   boxStatus: { method: "GET", path: "/agent/v1/{address}/box/status", paid: false },
+  boxSpendCap: { method: "POST", path: "/agent/v1/{address}/box/spend-cap", paid: false },
   boxMessageList: { method: "GET", path: "/agent/v1/{address}/box/messages", paid: false },
   boxMessageFetch: { method: "GET", path: "/agent/v1/{address}/box/messages/{seq}", paid: false },
   boxMessageDelete: { method: "DELETE", path: "/agent/v1/{address}/box/messages/{seq}", paid: false },
@@ -62,6 +73,8 @@ export const OPERATIONS = {
   telegramList: { method: "GET", path: "/agent/v1/{address}/telegram/list", paid: false },
   telegramDelete: { method: "DELETE", path: "/agent/v1/{address}/telegram/{id}", paid: false },
   telegramLink: { method: "POST", path: "/agent/v1/{address}/telegram/{id}/link", paid: false },
+  boxLink: { method: "POST", path: "/agent/v1/{address}/box/link", paid: false },
+  boxUnlink: { method: "DELETE", path: "/agent/v1/{address}/box/link", paid: false },
   // A post to an inbound address's own url (the one inboundCreate answers with): not an arcgate route.
   inboundPost: { method: "POST", paid: false },
 };
@@ -69,7 +82,7 @@ export const OPERATIONS = {
 // The client side of packages/core's agent signing, copied because this folder is published on its own
 // and cannot import @arcgate/core: AGENT_DOMAIN and AGENT_REQUEST_TYPES (agent/signing.ts), canonicalJson
 // and agentBodyHash (canonicalJson.ts, agent/signing.ts), signedPath (agent/paths.ts) and inboundSignature
-// (agent/inboundAuth.ts). skills/arcgate-trade/arcgate.test.ts pins each to core byte for byte.
+// (agent/inboundAuth.ts). skills/arcgate-trade/arcgate.test.ts pins each to core byte for byte, and LINKED_FREE below to core's linkedFree.
 const AGENT_DOMAIN = { name: "arcgate", version: "1" };
 const AGENT_REQUEST_TYPES = {
   AgentRequest: [
@@ -119,11 +132,23 @@ export function payingFetch(signer, maxAmount) {
   return wrapFetchWithPayment(fetch, client);
 }
 
+/** The setup creates a key of the box's linked account makes free (core's linkedFree; arcgate.test.ts pins it). On a box the key does not
+ * apply to (linked to another account, or to none) the API takes the create as if no key were sent: the 402, paid over x402. */
+export const LINKED_FREE = new Set(["inboundCreate", "watchCreate", "webhookCreate", "telegramCreate"]);
+
+/** The operations an account key can pay or authorize: ARCGATE-KEY is sent on these and no others (search, quote, boxLink and the
+ * LINKED_FREE creates; arcgate.test.ts pins them to core's keyPays operations). boxUnlink never carries it: the box's own signature, which
+ * every box call has, unlinks the box, so a key would add nothing. */
+export const KEYED_OPERATIONS = new Set(["search", "quote", "boxLink", ...LINKED_FREE]);
+const keyHeader = (operation, key) => (key !== undefined && KEYED_OPERATIONS.has(operation) ? { "ARCGATE-KEY": key } : {});
+
 /** The request of one call: `{ url, init }`, ready for fetch. The agent calls are made by `account`'s
  * address, lowercased in the path (the payer of a create must be the box). A create sends `args`, less
  * the path's `id` or `seq`, as its JSON body. A free call sends no body and signs the request instead;
- * boxMessageList's cursor and limit are its query, and are the signed body. `now` is unix seconds. */
-export async function buildRequest({ operation, args, account, apiUrl, now = Math.floor(Date.now() / 1000), nonce = `0x${randomBytes(32).toString("hex")}` }) {
+ * boxMessageList's cursor and limit are its query, and are the signed body. boxLink sends and signs `{accountId}` as its body, and boxSpendCap its arguments (`{maxUnitsPerDay}`, null to clear), both with a JSON content-type;
+ * with a `key` of an account the call carries it in ARCGATE-KEY (KEYED_OPERATIONS only): on boxLink it is what
+ * authorizes the call (boxUnlink never carries it: the box's signature authorizes that), on search, quote and the four setup creates it pays. `now` is unix seconds. */
+export async function buildRequest({ operation, args, account, apiUrl, key, now = Math.floor(Date.now() / 1000), nonce = `0x${randomBytes(32).toString("hex")}` }) {
   const op = OPERATIONS[operation];
   if (operation === "inboundPost") {
     const body = JSON.stringify(args.body);
@@ -131,18 +156,19 @@ export async function buildRequest({ operation, args, account, apiUrl, now = Mat
     return { url: args.url, init: { method: "POST", headers, body } };
   }
   if (!isBoxCall(operation)) {
-    const init = op.method === "POST" ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(args ?? {}) } : { method: "GET" };
+    const init = op.method === "POST" ? { method: "POST", headers: { "content-type": "application/json", ...keyHeader(operation, key) }, body: JSON.stringify(args ?? {}) } : { method: "GET" };
     return { url: `${apiUrl}${op.path}`, init };
   }
   const { id, seq, ...rest } = args ?? {};
   const path = signedPath(op.path, account.address, { id, seq: seq === undefined ? undefined : String(seq) });
   if (op.paid) {
-    return { url: `${apiUrl}${path}`, init: { method: op.method, headers: { "content-type": "application/json" }, body: JSON.stringify(rest) } };
+    return { url: `${apiUrl}${path}`, init: { method: op.method, headers: { "content-type": "application/json", ...keyHeader(operation, key) }, body: JSON.stringify(rest) } };
   }
   // Only boxMessageList has a signed query, and the server signs just its cursor and limit, as numbers.
   // Any other free call signs no body, whatever else the arguments carry.
   const query = operation === "boxMessageList" ? Object.fromEntries(["cursor", "limit"].filter((k) => rest[k] !== undefined).map((k) => [k, Number(rest[k])])) : {};
-  const body = Object.keys(query).length > 0 ? query : undefined;
+  // boxLink signs just {accountId}; boxSpendCap signs the arguments as given, so a missing maxUnitsPerDay is the API's 400, not a bad signature.
+  const body = operation === "boxLink" ? { accountId: rest.accountId } : operation === "boxSpendCap" ? rest : Object.keys(query).length > 0 ? query : undefined;
   const expiry = now + SIGNATURE_TTL_SECONDS;
   const signature = await account.signTypedData({
     domain: AGENT_DOMAIN,
@@ -150,14 +176,21 @@ export async function buildRequest({ operation, args, account, apiUrl, now = Mat
     primaryType: "AgentRequest",
     message: { address: account.address, method: op.method, path, bodyHash: agentBodyHash(body), nonce, expiry: BigInt(expiry) },
   });
+  const headers = { "AGENT-SIGNATURE": signature, "AGENT-NONCE": nonce, "AGENT-EXPIRY": String(expiry), ...keyHeader(operation, key) };
+  if (operation === "boxLink" || operation === "boxSpendCap") return { url: `${apiUrl}${path}`, init: { method: op.method, headers: { ...headers, "content-type": "application/json" }, body: JSON.stringify(body) } };
   const search = body === undefined ? "" : `?${new URLSearchParams(Object.entries(body).map(([k, v]) => [k, String(v)]))}`;
-  return { url: `${apiUrl}${path}${search}`, init: { method: op.method, headers: { "AGENT-SIGNATURE": signature, "AGENT-NONCE": nonce, "AGENT-EXPIRY": String(expiry) } } };
+  return { url: `${apiUrl}${path}${search}`, init: { method: op.method, headers } };
 }
 
-/** One call to the API. `fetchFn` is plain fetch for free operations, payingFetch for paid ones. */
-export async function call({ fetchFn, apiUrl, operation, body, account }) {
-  const { url, init } = await buildRequest({ operation, args: body, account, apiUrl });
-  const res = await fetchFn(url, init);
+/** One call to the API. `fetchFn` is plain fetch for free operations, payingFetch for paid ones. A `key` goes on the KEYED_OPERATIONS as it
+ * is, and the API decides what it does: on a setup create it is free for a box linked to the key's account, and paid over x402 on any other. */
+export async function call({ fetchFn, apiUrl, operation, body, account, key }) {
+  const { url, init } = await buildRequest({ operation, args: body, account, apiUrl, key });
+  return answerOf(await fetchFn(url, init));
+}
+
+/** What `call` prints of one response: `{ status, body, payment }`. */
+async function answerOf(res) {
   const text = await res.text();
   let parsed;
   try {
@@ -203,7 +236,7 @@ async function main(argv, env) {
   }
   const apiUrl = (env.API_URL?.trim() || "https://api.arcgate.dev").replace(/\/+$/, "");
   try {
-    const result = await call({ fetchFn, apiUrl, operation, body, account });
+    const result = await call({ fetchFn, apiUrl, operation, body, account, key: env.ARCGATE_KEY?.trim() || undefined });
     console.log(JSON.stringify(result, null, 2));
     return result.status >= 400 ? 1 : 0;
   } catch (err) {
